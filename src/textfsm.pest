@@ -27,11 +27,11 @@ state_name = @{ ( !"." ~ (ASCII_ALPHANUMERIC | "_"))+ }
 // Rules
 // rules = { (rule ~ NEWLINE)+ }
 rules = { rule ~ (NEWLINE+ ~ rule)* ~ NEWLINE* }
-rule = { indentation? ~ rule_match ~ rule_transition? }
+rule = ${ indentation? ~ rule_match ~ rule_transition? }
 indentation = _{ " "+ }
 // rule_match = @{ "^" ~ (!" ->" ~ ANY)* }
-rule_match = @{ "^" ~ (!("-> " | NEWLINE) ~ ANY)* }
-rule_transition = _{ "-> " ~ transition_action }
+rule_match = { "^" ~ (!(" -> " | NEWLINE) ~ ANY)* }
+rule_transition = _{ " -> " ~ WHITESPACE* ~ transition_action }
 
 transition_action = ${ (line_rec_action ~ next_state? ) | next_state }
 // hide line_rec_action - transition_action is atomic, so no whitespace handling here!
