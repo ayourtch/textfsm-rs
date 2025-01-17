@@ -156,12 +156,32 @@ impl TextFSM {
                 }
                 Rule::rules => {
                     for pair in pair.clone().into_inner() {
+                        let mut out_str: String = format!("");
                         let rule = Self::parse_state_rule(&pair);
                         println!("RULE: {:#?}", &rule);
                         let varsubst =
                             varsubst::VariableParser::parse_dollar_string(&rule.rule_match)
                                 .unwrap();
                         println!("DOLLAR STR: {:?}", &varsubst);
+                        {
+                            use varsubst::ParseChunk;
+                            for i in &varsubst {
+                                match i {
+                                    ParseChunk::DollarDollar => out_str.push('$'),
+                                    ParseChunk::Text(s) => out_str.push_str(s),
+                                    ParseChunk::Variable(v) => {
+                                        match values.get(v) {
+                                            Some(val) => {
+                                                let v_out = format!("(?P<{}>{})", v, val.regex_pattern);
+                                                out_str.push_str(&v_out);
+                                            },
+                                            None => panic!("Can not find variable '{}' while parsing rule_match '{}'", &v, &rule.rule_match),
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        println!("OUT_STR: {}", out_str);
                     }
                 }
                 x => {
