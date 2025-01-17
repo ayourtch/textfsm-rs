@@ -22,10 +22,13 @@ impl TextFSM {
         }
     }
     pub fn parse_state_rule(pair: &Pair<'_, Rule>) {
+        println!("----- state rule ---");
         let spaces = "";
-        println!("{}XRule:    {:?}", spaces, pair.as_rule());
-        println!("{}Span:    {:?}", spaces, pair.as_span());
-        println!("{}Text:    {}", spaces, pair.as_str());
+        for pair in pair.clone().into_inner() {
+          println!("{}state Rule:    {:?}", spaces, pair.as_rule());
+          println!("{}Span:    {:?}", spaces, pair.as_span());
+          println!("{}Text:    {}", spaces, pair.as_str());
+        }
     }
     pub fn parse_state_def(pair: &Pair<'_, Rule>) {
         let mut state_name: Option<String> = None;
@@ -39,7 +42,7 @@ impl TextFSM {
                 }
             } else {
                 let spaces = "";
-                println!("{}XRule:    {:?}", spaces, pair.as_rule());
+                println!("{}state def Rule:    {:?}", spaces, pair.as_rule());
                 println!("{}Span:    {:?}", spaces, pair.as_span());
                 println!("{}Text:    {}", spaces, pair.as_str());
             }
