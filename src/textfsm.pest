@@ -34,7 +34,7 @@ rule_match = @{ "^" ~ (!("-> " | NEWLINE) ~ ANY)* }
 rule_transition = { "-> " ~ transition_actions }
 transition_actions = { transition_action+ }
 
-transition_action = { line_rec_action | next_state }
+transition_action = { (line_rec_action ~ next_state? ) | next_state }
 line_rec_action = { err_state | line_action ~ ( "." ~ record_action)? | record_action }
 line_action = { "Next" | "Continue" }
 record_action = { "NoRecord" | "Record" | "Clear" | "Clearall" }
