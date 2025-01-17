@@ -1,0 +1,30 @@
+//! Variable substitution grammar
+main = { SOI ~ text* ~ EOI }
+
+// Text contains a mix of literals and variable references
+text = _{ variable_reference | literal }
+
+// Variable reference can be any of the three formats
+variable_reference = _{ dollar_dollar | braced_variable | simple_variable }
+
+// Special case: $$
+dollar_dollar = { "$$" }
+
+// ${VARIABLE_NAME} format
+braced_variable = _{ "$" ~ "{" ~ variable_name ~ "}" }
+
+// $VARIABLE_NAME format
+simple_variable = _{ "$" ~ variable_name }
+
+// Variable name rules
+variable_name = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// Literal text (anything that's not the start of a variable reference)
+// Must match at least one character
+literal = @{ 
+    (!("$") ~ ANY)+ |
+    ("$" ~ !(("{" | ASCII_ALPHA | "$")) ~ ANY)+
+}
+
+// Whitespace handling
+WHITESPACE = { " " | "\t" | "\r" | "\n" }

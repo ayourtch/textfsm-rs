@@ -4,9 +4,10 @@ use pest_derive::Parser;
 use regex::Regex;
 use std::collections::HashMap;
 
+pub mod varsubst;
+
 #[derive(Parser)]
 #[grammar = "textfsm.pest"]
-
 pub struct TextFSMParser;
 
 pub struct TextFSM {}
@@ -124,7 +125,7 @@ impl TextFSM {
                 }
                 Rule::transition_action => {
                     transition = Self::parse_state_rule_transition(&pair);
-                    println!("TRANSITION: {:?}", &transition);
+                    // println!("TRANSITION: {:?}", &transition);
                 }
                 x => {
                     println!("{}state Rule:    {:?}", spaces, pair.as_rule());
@@ -140,7 +141,10 @@ impl TextFSM {
             transition,
         }
     }
-    pub fn parse_state_definition(pair: &Pair<'_, Rule>) {
+    pub fn parse_state_definition(
+        pair: &Pair<'_, Rule>,
+        values: &HashMap<String, ValueDefinition>,
+    ) {
         let mut state_name: Option<String> = None;
         // Self::print_pair(20, pair);
 
@@ -148,7 +152,7 @@ impl TextFSM {
             match pair.as_rule() {
                 Rule::state_header => {
                     state_name = Some(pair.as_str().to_string());
-                    println!("SET STATE NAME: {:?}", &state_name);
+                    // println!("SET STATE NAME: {:?}", &state_name);
                 }
                 Rule::rules => {
                     for pair in pair.clone().into_inner() {
@@ -167,12 +171,12 @@ impl TextFSM {
         }
         println!("STATE: {:?}", &state_name);
     }
-    pub fn parse_state_defs(pair: &Pair<'_, Rule>) {
+    pub fn parse_state_defs(pair: &Pair<'_, Rule>, values: &HashMap<String, ValueDefinition>) {
         println!("=== STATE DEFINITIONS ===");
         for pair in pair.clone().into_inner() {
             match pair.as_rule() {
                 Rule::state_definition => {
-                    Self::parse_state_definition(&pair);
+                    Self::parse_state_definition(&pair, values);
                 }
                 x => {
                     panic!("state definition rule {:?} not supported", x);
@@ -225,23 +229,6 @@ impl TextFSM {
         }
         Ok(vals)
     }
-    pub fn process_pair(indent: usize, pair: &Pair<'_, Rule>) {
-        // println!("Debug: {:#?}", &pair);
-        let spaces = " ".repeat(indent);
-        if Rule::value_definitions == pair.as_rule() {
-            Self::parse_value_defs(&pair);
-        } else if Rule::state_definitions == pair.as_rule() {
-            Self::parse_state_defs(&pair);
-        } else if Rule::EOI == pair.as_rule() {
-        } else {
-            println!("{}ZZZRule:    {:?}", spaces, pair.as_rule());
-            println!("{}Span:    {:?}", spaces, pair.as_span());
-            println!("{}Text:    {}", spaces, pair.as_str());
-            for p in pair.clone().into_inner() {
-                Self::print_pair(indent + 2, &p);
-            }
-        }
-    }
     pub fn from_file(fname: &str) -> Self {
         println!("Path: {}", &fname);
         let template = std::fs::read_to_string(&fname).expect("File read failed");
@@ -259,7 +246,7 @@ impl TextFSM {
                             values = Self::parse_value_defs(&pair).unwrap();
                         }
                         Rule::state_definitions => {
-                            Self::parse_state_defs(&pair);
+                            Self::parse_state_defs(&pair, &values);
                         }
                         Rule::EOI => {
                             seen_eoi = true;
