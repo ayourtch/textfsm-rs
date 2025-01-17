@@ -41,6 +41,12 @@ pub struct RuleTransition {
 }
 
 #[derive(Debug, Default, PartialEq)]
+pub struct StateRule {
+    rule_match: String,
+    transition: RuleTransition,
+}
+
+#[derive(Debug, Default, PartialEq)]
 pub struct ValueDefinition {
     name: String,
     regex_pattern: String,
@@ -104,25 +110,35 @@ impl TextFSM {
             maybe_next_state,
         }
     }
-    pub fn parse_state_rule(pair: &Pair<'_, Rule>) {
+    pub fn parse_state_rule(pair: &Pair<'_, Rule>) -> StateRule {
         let mut rule_match: Option<String> = None;
-        println!("----- state rule ---");
+        // println!("----- state rule ---");
         // Self::print_pair(10, pair);
         // println!("--------");
+        let mut transition: RuleTransition = Default::default();
         let spaces = "";
         for pair in pair.clone().into_inner() {
-            if pair.as_rule() == Rule::rule_match {
-                rule_match = Some(pair.as_str().to_string());
-            } else if pair.as_rule() == Rule::transition_action {
-                let trn = Self::parse_state_rule_transition(&pair);
-                println!("TRANSITION: {:?}", &trn);
-            } else {
-                println!("{}state Rule:    {:?}", spaces, pair.as_rule());
-                println!("{}Span:    {:?}", spaces, pair.as_span());
-                println!("{}Text:    {}", spaces, pair.as_str());
+            match pair.as_rule() {
+                Rule::rule_match => {
+                    rule_match = Some(pair.as_str().to_string());
+                }
+                Rule::transition_action => {
+                    transition = Self::parse_state_rule_transition(&pair);
+                    println!("TRANSITION: {:?}", &transition);
+                }
+                x => {
+                    println!("{}state Rule:    {:?}", spaces, pair.as_rule());
+                    println!("{}Span:    {:?}", spaces, pair.as_span());
+                    println!("{}Text:    {}", spaces, pair.as_str());
+                    panic!("state rule {:?} not supported", &x);
+                }
             }
         }
-        println!("RULE result: {:?}", &rule_match);
+        let rule_match = rule_match.expect("rule_match must be always set");
+        StateRule {
+            rule_match,
+            transition,
+        }
     }
     pub fn parse_state_definition(pair: &Pair<'_, Rule>) {
         let mut state_name: Option<String> = None;
@@ -136,7 +152,8 @@ impl TextFSM {
                 }
                 Rule::rules => {
                     for pair in pair.clone().into_inner() {
-                        Self::parse_state_rule(&pair);
+                        let rule = Self::parse_state_rule(&pair);
+                        println!("RULE: {:#?}", &rule);
                     }
                 }
                 x => {
