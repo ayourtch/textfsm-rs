@@ -1,10 +1,4 @@
-use pest::iterators::Pair;
-use pest::Parser;
-use pest_derive::Parser;
-
-#[derive(Parser)]
-#[grammar = "textfsm.pest"]
-struct TextFSMParser;
+use textfsm_rs::*;
 
 #[cfg(test)]
 mod tests {
