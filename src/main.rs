@@ -65,6 +65,24 @@ GetDescription
     }
 
     #[test]
+    fn test_complete_template_error() {
+        let input = r#"Value PORT_ID (\S+)
+Value DESCRIPTION (.+)
+
+Start
+  ^=+\s*$$
+  ^\s*$$
+  ^Port\s+Descriptions\s+on\s\S+\s+\S+\s*$$
+  ^Port\s+Id\s+Description\s*$$
+  ^${PORT_ID}\s+${DESCRIPTION}\s*$$ -> Record
+  ^-+\s*$$
+  ^. -> Error"#;
+        let pairs = TextFSMParser::parse(Rule::file, input).unwrap();
+        println!("Pairs: {:?}", &pairs);
+        assert_eq!(pairs.count(), 3);
+    }
+
+    #[test]
     fn test_rules_with_no_transitions() {
         let input = r#"Start
   ^interface$
@@ -87,6 +105,24 @@ GetDescription
   ^(?:round-trip\s+min\s+=\s+${RTT_MIN}ms,\s+avg\s+=\s+${RTT_AVG}ms,\s+max\s+=\s+${RTT_MAX}ms,\s+stddev\s+=\s+${STD_DEV}ms)?
   # Error out if raw data does not match any above rules.
   ^.* -> Error "Could not parse line:"
+"#;
+        let pairs = TextFSMParser::parse(Rule::state_definition, input).unwrap();
+        println!("Pairs: {:?}", &pairs);
+        assert_eq!(pairs.count(), 1);
+    }
+
+    #[test]
+    fn test_rules_with_no_transitions_complex_error_nomsg() {
+        let input = r#"Start
+  ^PING\s+${DESTINATION}\s+${PKT_SIZE}\s+data\s+bytes*$$
+  ^(?:${RESPONSE_STREAM})
+  ^\.*$$
+  ^\s*$$
+  ^-+
+  ^${SENT_QTY}\s+packet(?:s)?\s+transmitted,(?:\s+${BOUNCE_QTY}\s+packet(?:s)?\s+bounced,)?\s+${SUCCESS_QTY}\s+packet(?:s)?\s+received,\s+(?:${DUPLICATE_QTY}\s+duplicate(?:s)?)?(?:${LOSS_PCT}%\s+packet\s+loss)?
+  ^(?:round-trip\s+min\s+=\s+${RTT_MIN}ms,\s+avg\s+=\s+${RTT_AVG}ms,\s+max\s+=\s+${RTT_MAX}ms,\s+stddev\s+=\s+${STD_DEV}ms)?
+  # Error out if raw data does not match any above rules.
+  ^.* -> Error
 "#;
         let pairs = TextFSMParser::parse(Rule::state_definition, input).unwrap();
         println!("Pairs: {:?}", &pairs);

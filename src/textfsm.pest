@@ -9,7 +9,7 @@ file = _{ SOI ~ value_definitions? ~ state_definitions ~ EOI }
 value_definitions = { value_definition+ ~ NEWLINE* }
 value_definition = { "Value" ~ options? ~ identifier ~ regex_pattern ~ NEWLINE }
 options = @{ option ~ ("," ~ option)* }
-option = @{ "Required" | "List" | "Filldown" | "Key" }
+option = @{ "Required" | "List" | "Filldown" | "Fillup" | "Key" }
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 regex_pattern = @{ "(" ~ inner_pattern ~ ")" }
 inner_pattern = @{ (nested_parens | !("(" | ")") ~ ANY)* }
@@ -17,12 +17,13 @@ nested_parens = @{ "(" ~ inner_pattern ~ ")" }
 
 // State Definitions Section
 state_definitions = { state_definition+ }
-state_definition = { state_header ~ NEWLINE ~ rules ~ NEWLINE* }
+state_definition = { state_header ~ NEWLINE ~ rules? ~ NEWLINE* }
 state_header = { ("Start" | state_name) }
 state_name = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
 // Rules
-rules = { (rule ~ NEWLINE)+ }
+// rules = { (rule ~ NEWLINE)+ }
+rules = { rule ~ (NEWLINE+ ~ rule)* ~ NEWLINE* }
 rule = { indentation? ~ rule_match ~ rule_transition? }
 indentation = _{ " "+ }
 // rule_match = @{ "^" ~ (!"->" ~ ANY)* }
