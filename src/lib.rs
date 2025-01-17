@@ -10,6 +10,35 @@ pub struct TextFSMParser;
 
 pub struct TextFSM {}
 
+#[derive(Debug, Default, PartialEq)]
+pub enum LineAction {
+    #[default]
+    Continue,
+    Next,
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub enum RecordAction {
+    #[default]
+    NoRecord,
+    Record,
+    Clear,
+    Clearall,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum NextState {
+    Error(Option<String>),
+    NamedState(String),
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub struct RuleTransition {
+    line_action: LineAction,
+    record_action: RecordAction,
+    maybe_next_state: Option<NextState>,
+}
+
 impl TextFSM {
     fn print_pair(indent: usize, pair: &Pair<'_, Rule>) {
         // println!("Debug: {:#?}", &pair);
@@ -21,8 +50,51 @@ impl TextFSM {
             Self::print_pair(indent + 2, &p);
         }
     }
-    pub fn parse_state_rule_transition(pair: &Pair<'_, Rule>) {
+    pub fn parse_state_rule_transition(pair: &Pair<'_, Rule>) -> RuleTransition {
+        let mut record_action: RecordAction = Default::default();
+        let mut line_action: LineAction = Default::default();
+        let mut maybe_next_state: Option<NextState> = None;
         Self::print_pair(5, pair);
+        for pair in pair.clone().into_inner() {
+            match pair.as_rule() {
+                Rule::record_action => {
+                    record_action = match pair.as_str() {
+                        "Record" => RecordAction::Record,
+                        "NoRecord" => RecordAction::NoRecord,
+                        "Clear" => RecordAction::Clear,
+                        "Clearall" => RecordAction::Clearall,
+                        x => panic!("Record action {} not supported", x),
+                    };
+                }
+                Rule::line_action => {
+                    line_action = match pair.as_str() {
+                        "Continue" => LineAction::Continue,
+                        "Next" => LineAction::Next,
+                        x => panic!("Record action {} not supported", x),
+                    };
+                }
+                Rule::err_state => {
+                    let mut maybe_err_msg: Option<String> = None;
+                    for p in pair.clone().into_inner() {
+                        if p.as_rule() == Rule::err_msg {
+                            maybe_err_msg = Some(p.as_str().to_string());
+                        }
+                    }
+                    maybe_next_state = Some(NextState::Error(maybe_err_msg));
+                }
+                Rule::next_state => {
+                    maybe_next_state = Some(NextState::NamedState(pair.as_str().to_string()));
+                }
+                x => {
+                    panic!("Rule {:?} not supported!", &x);
+                }
+            }
+        }
+        RuleTransition {
+            record_action,
+            line_action,
+            maybe_next_state,
+        }
     }
     pub fn parse_state_rule(pair: &Pair<'_, Rule>) {
         let mut rule_match: Option<String> = None;
@@ -33,8 +105,9 @@ impl TextFSM {
         for pair in pair.clone().into_inner() {
             if pair.as_rule() == Rule::rule_match {
                 rule_match = Some(pair.as_str().to_string());
-            } else if pair.as_rule() == Rule::rule_transition {
-                Self::parse_state_rule_transition(&pair);
+            } else if pair.as_rule() == Rule::transition_action {
+                let trn = Self::parse_state_rule_transition(&pair);
+                println!("TRANSITION: {:?}", &trn);
             } else {
                 println!("{}state Rule:    {:?}", spaces, pair.as_rule());
                 println!("{}Span:    {:?}", spaces, pair.as_span());

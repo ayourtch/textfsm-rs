@@ -34,7 +34,7 @@ mod tests {
 
     #[test]
     fn test_state_definition() {
-        let input = "Start\n  ^interface -> Record End\n";
+        let input = "Start\n  ^interface -> Continue.Record End\n";
         let pairs = TextFSMParser::parse(Rule::state_definition, input).unwrap();
         assert_eq!(pairs.count(), 1);
     }
@@ -49,7 +49,7 @@ Start
   ^$ -> Start
 
 GetDescription
-  ^description -> Record Start
+  ^description -> Continue.Record Start
   ^$ -> GetDescription
   ^. -> Error
 "#;
