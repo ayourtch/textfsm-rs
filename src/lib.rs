@@ -39,6 +39,13 @@ pub struct RuleTransition {
     maybe_next_state: Option<NextState>,
 }
 
+#[derive(Debug, Default, PartialEq)]
+pub struct ValueDefinition {
+    name: String,
+    regex_pattern: String,
+    options: Option<String>,
+}
+
 impl TextFSM {
     fn print_pair(indent: usize, pair: &Pair<'_, Rule>) {
         // println!("Debug: {:#?}", &pair);
@@ -54,7 +61,7 @@ impl TextFSM {
         let mut record_action: RecordAction = Default::default();
         let mut line_action: LineAction = Default::default();
         let mut maybe_next_state: Option<NextState> = None;
-        Self::print_pair(5, pair);
+        // Self::print_pair(5, pair);
         for pair in pair.clone().into_inner() {
             match pair.as_rule() {
                 Rule::record_action => {
@@ -135,32 +142,44 @@ impl TextFSM {
         }
         println!("STATE: {:?}", &state_name);
     }
-    pub fn parse_value_def(pair: &Pair<'_, Rule>) {
+    pub fn parse_value_definition(pair: &Pair<'_, Rule>) -> Result<ValueDefinition, String> {
+        println!("value definition");
+        let mut name: Option<String> = None;
+        let mut regex_pattern: Option<String> = None;
+        let mut regex_val: Option<Regex> = None;
+        let mut options: Option<String> = None;
+        for p in pair.clone().into_inner() {
+            match p.as_rule() {
+                Rule::options => options = Some(p.as_str().to_string()),
+                Rule::identifier => name = Some(p.as_str().to_string()),
+                Rule::regex_pattern => {
+                    regex_val = Regex::new(p.as_str()).ok();
+                    regex_pattern = Some(p.as_str().to_string());
+                }
+                x => {
+                    panic!("Rule {:?} in value definition", x);
+                }
+            }
+            // Self::print_pair(indent + 2, &p);
+        }
+        if let (Some(name), Some(regex_pattern)) = (name.clone(), regex_pattern.clone()) {
+            Ok(ValueDefinition {
+                name,
+                regex_pattern,
+                options,
+            })
+        } else {
+            Err(format!(
+                "Error parsing value: {:?} {:?} {:?} [ {:?} ]",
+                &name, &regex_pattern, &regex_val, &options
+            ))
+        }
+    }
+    pub fn parse_value_defs(pair: &Pair<'_, Rule>) {
         for pair in pair.clone().into_inner() {
             if Rule::value_definition == pair.as_rule() {
-                println!("value definition");
-                let mut name: Option<String> = None;
-                let mut regex_pattern: Option<String> = None;
-                let mut regex_val: Option<Regex> = None;
-                let mut value_options: Option<String> = None;
-                for p in pair.clone().into_inner() {
-                    match p.as_rule() {
-                        Rule::options => value_options = Some(p.as_str().to_string()),
-                        Rule::identifier => name = Some(p.as_str().to_string()),
-                        Rule::regex_pattern => {
-                            regex_val = Regex::new(p.as_str()).ok();
-                            regex_pattern = Some(p.as_str().to_string());
-                        }
-                        x => {
-                            panic!("Rule {:?} in value definition", x);
-                        }
-                    }
-                    // Self::print_pair(indent + 2, &p);
-                }
-                println!(
-                    "   {:?} {:?} {:?} [ {:?} ]",
-                    &name, &regex_pattern, &regex_val, &value_options
-                );
+                let val = Self::parse_value_definition(&pair);
+                println!("VAL: {:?}", &val);
             }
         }
     }
@@ -168,7 +187,7 @@ impl TextFSM {
         // println!("Debug: {:#?}", &pair);
         let spaces = " ".repeat(indent);
         if Rule::value_definitions == pair.as_rule() {
-            Self::parse_value_def(&pair);
+            Self::parse_value_defs(&pair);
         } else if Rule::state_definitions == pair.as_rule() {
             for pair in pair.clone().into_inner() {
                 println!("=== not last state definition ===");
