@@ -1,0 +1,45 @@
+// TextFSM Grammar Rules
+WHITESPACE = _{ " " | "\t" }
+COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }
+NEWLINE = _{ "\r\n" | "\n" | "\r" }
+
+file = _{ SOI ~ value_definitions? ~ state_definitions ~ EOI }
+
+// Value Definitions Section
+value_definitions = { value_definition+ ~ NEWLINE* }
+value_definition = { "Value" ~ options? ~ identifier ~ regex_pattern ~ NEWLINE }
+options = @{ option ~ ("," ~ option)* }
+option = @{ "Required" | "List" | "Filldown" | "Key" }
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+regex_pattern = @{ "(" ~ inner_pattern ~ ")" }
+inner_pattern = @{ (nested_parens | !("(" | ")") ~ ANY)* }
+nested_parens = @{ "(" ~ inner_pattern ~ ")" }
+
+// State Definitions Section
+state_definitions = { state_definition+ }
+state_definition = { state_header ~ NEWLINE ~ rules ~ NEWLINE* }
+state_header = { ("Start" | state_name) }
+state_name = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// Rules
+rules = { (rule ~ NEWLINE)+ }
+rule = { indentation? ~ rule_match ~ rule_transition? }
+indentation = _{ " "+ }
+// rule_match = @{ "^" ~ (!"->" ~ ANY)* }
+rule_match = @{ "^" ~ (!("->" | NEWLINE) ~ ANY)* }
+rule_transition = { "->" ~ transition_actions }
+transition_actions = { (transition_action ~ space?)+ }
+
+transition_action = { line_rec_action | next_state }
+line_rec_action = { line_action ~ ( "." ~ record_action) | record_action }
+line_action = { "Next" | "Continue" }
+record_action = { "NoRecord" | "Record" | "Clear" | "Clearall" }
+next_state = { "End" | state_name | "Error" ~ err_msg? }
+err_msg = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+space = _{ " " }
+
+// Record fields (for future expansion)
+record_fields = { record_field+ }
+record_field = { field_name? ~ field_value }
+field_name = { identifier ~ "=" }
+field_value = { "${" ~ identifier ~ "}" | "." | regex_pattern }
