@@ -15,7 +15,7 @@ pub enum ParseChunk {
 }
 
 impl VariableParser {
-    fn parse_dollar_string(input: &str) -> Result<Vec<ParseChunk>, Error<Rule>> {
+    pub fn parse_dollar_string(input: &str) -> Result<Vec<ParseChunk>, Error<Rule>> {
         let mut out: Vec<ParseChunk> = vec![];
         let pairs = VariableParser::parse(Rule::main, input)?;
         for pair in pairs {
@@ -33,6 +33,9 @@ impl VariableParser {
                     }
                     Rule::EOI => {
                         // success
+                    }
+                    Rule::WHITESPACE => {
+                        out.push(ParseChunk::Text(inner_pair.as_str().to_string()));
                     }
                     x => {
                         panic!("Rule {:?} should not happen at varsubst", x);

@@ -158,6 +158,10 @@ impl TextFSM {
                     for pair in pair.clone().into_inner() {
                         let rule = Self::parse_state_rule(&pair);
                         println!("RULE: {:#?}", &rule);
+                        let varsubst =
+                            varsubst::VariableParser::parse_dollar_string(&rule.rule_match)
+                                .unwrap();
+                        println!("DOLLAR STR: {:?}", &varsubst);
                     }
                 }
                 x => {
@@ -176,7 +180,7 @@ impl TextFSM {
         for pair in pair.clone().into_inner() {
             match pair.as_rule() {
                 Rule::state_definition => {
-                    Self::parse_state_definition(&pair, values);
+                    let state = Self::parse_state_definition(&pair, values);
                 }
                 x => {
                     panic!("state definition rule {:?} not supported", x);
