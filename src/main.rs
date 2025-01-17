@@ -12,20 +12,20 @@ mod tests {
     use pest::Parser;
 
     #[test]
-    fn test_regex_pattern () {
+    fn test_regex_pattern() {
         let input = r#"((\d+\/?)+)
 "#;
         let pairs = TextFSMParser::parse(Rule::regex_pattern, input).unwrap();
         assert_eq!(pairs.count(), 1);
     }
     #[test]
-    fn test_rule_with_err_msg () {
+    fn test_rule_with_err_msg() {
         let input = r#"  ^.* -> Error "Could not parse line:""#;
         let pairs = TextFSMParser::parse(Rule::rule, input).unwrap();
         assert_eq!(pairs.count(), 1);
     }
     #[test]
-    fn test_err_msg () {
+    fn test_err_msg() {
         let input = r#""test""#;
         let pairs = TextFSMParser::parse(Rule::err_msg, input).unwrap();
         assert_eq!(pairs.count(), 1);
@@ -58,6 +58,23 @@ GetDescription
   ^description -> Record Start
   ^$ -> GetDescription
   ^. -> Error
+"#;
+        let pairs = TextFSMParser::parse(Rule::file, input).unwrap();
+        println!("Pairs: {:?}", &pairs);
+        assert_eq!(pairs.count(), 3);
+    }
+
+    #[test]
+    fn test_complete_template_asa() {
+        let input = r#"Value Required RESOURCE (.+?)
+Value DENIED (\d+)
+Value CONTEXT (.+?)
+
+Start
+  ^x -> GetDescription
+
+Startr_ecord
+  ^x -> X
 "#;
         let pairs = TextFSMParser::parse(Rule::file, input).unwrap();
         println!("Pairs: {:?}", &pairs);
@@ -184,6 +201,7 @@ fn main() {
     for arg in std::env::args().skip(1) {
         println!("Reading file {}", &arg);
         let template = std::fs::read_to_string(&arg).expect("File read failed");
+        let template = format!("{}\n", template);
 
         match TextFSMParser::parse(Rule::file, &template) {
             Ok(pairs) => {

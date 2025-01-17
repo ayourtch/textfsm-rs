@@ -18,17 +18,20 @@ nested_parens = @{ "(" ~ inner_pattern ~ ")" }
 // State Definitions Section
 state_definitions = { state_definition+ }
 state_definition = { state_header ~ NEWLINE ~ rules? ~ NEWLINE* }
-state_header = { ("Start" | state_name) }
-state_name = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+state_header = { state_name }
+
+// states in the wild do have numeric starts
+// state_name = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+state_name = @{ (ASCII_ALPHANUMERIC | "_")+ }
 
 // Rules
 // rules = { (rule ~ NEWLINE)+ }
 rules = { rule ~ (NEWLINE+ ~ rule)* ~ NEWLINE* }
 rule = { indentation? ~ rule_match ~ rule_transition? }
 indentation = _{ " "+ }
-// rule_match = @{ "^" ~ (!"->" ~ ANY)* }
-rule_match = @{ "^" ~ (!("->" | NEWLINE) ~ ANY)* }
-rule_transition = { "->" ~ transition_actions }
+// rule_match = @{ "^" ~ (!" ->" ~ ANY)* }
+rule_match = @{ "^" ~ (!("-> " | NEWLINE) ~ ANY)* }
+rule_transition = { "-> " ~ transition_actions }
 transition_actions = { transition_action+ }
 
 transition_action = { line_rec_action | next_state }
