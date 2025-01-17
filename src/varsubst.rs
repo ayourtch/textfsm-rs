@@ -18,11 +18,16 @@ impl VariableParser {
     pub fn parse_dollar_string(input: &str) -> Result<Vec<ParseChunk>, Error<Rule>> {
         let mut out: Vec<ParseChunk> = vec![];
         let pairs = VariableParser::parse(Rule::main, input)?;
+        // println!("varsubst input: '{}'", &input);
         for pair in pairs {
-            println!("Rule: {:?}", pair.as_rule());
+            // println!("Rule: {:?}", pair.as_rule());
             for inner_pair in pair.into_inner() {
                 match inner_pair.as_rule() {
                     Rule::dollar_dollar => {
+                        out.push(ParseChunk::DollarDollar);
+                    }
+                    Rule::end_dollar => {
+                        println!("WARNING: unescaped dollar in the end of line '{}'", &input);
                         out.push(ParseChunk::DollarDollar);
                     }
                     Rule::variable_name => {
@@ -41,11 +46,13 @@ impl VariableParser {
                         panic!("Rule {:?} should not happen at varsubst", x);
                     }
                 }
+                /*
                 println!(
                     "Inner: {:?} = '{}'",
                     inner_pair.as_rule(),
                     inner_pair.as_str()
                 );
+                */
             }
         }
         Ok(out)

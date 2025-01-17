@@ -5,10 +5,13 @@ main = { SOI ~ text* ~ EOI }
 text = _{ variable_reference | literal }
 
 // Variable reference can be any of the three formats
-variable_reference = _{ dollar_dollar | braced_variable | simple_variable }
+variable_reference = _{ dollar_dollar | end_dollar | braced_variable | simple_variable }
 
 // Special case: $$
 dollar_dollar = { "$$" }
+
+end_dollar = { "$" ~ &EOI }
+
 
 // ${VARIABLE_NAME} format
 braced_variable = _{ "$" ~ "{" ~ variable_name ~ "}" }
