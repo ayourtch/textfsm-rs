@@ -21,14 +21,27 @@ impl TextFSM {
             Self::print_pair(indent + 2, &p);
         }
     }
+    pub fn parse_state_rule_transition(pair: &Pair<'_, Rule>) {
+        Self::print_pair(5, pair);
+    }
     pub fn parse_state_rule(pair: &Pair<'_, Rule>) {
+        let mut rule_match: Option<String> = None;
         println!("----- state rule ---");
+        // Self::print_pair(10, pair);
+        // println!("--------");
         let spaces = "";
         for pair in pair.clone().into_inner() {
-          println!("{}state Rule:    {:?}", spaces, pair.as_rule());
-          println!("{}Span:    {:?}", spaces, pair.as_span());
-          println!("{}Text:    {}", spaces, pair.as_str());
+            if pair.as_rule() == Rule::rule_match {
+                rule_match = Some(pair.as_str().to_string());
+            } else if pair.as_rule() == Rule::rule_transition {
+                Self::parse_state_rule_transition(&pair);
+            } else {
+                println!("{}state Rule:    {:?}", spaces, pair.as_rule());
+                println!("{}Span:    {:?}", spaces, pair.as_span());
+                println!("{}Text:    {}", spaces, pair.as_str());
+            }
         }
+        println!("RULE result: {:?}", &rule_match);
     }
     pub fn parse_state_def(pair: &Pair<'_, Rule>) {
         let mut state_name: Option<String> = None;
