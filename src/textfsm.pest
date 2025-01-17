@@ -22,7 +22,7 @@ state_header = { state_name }
 
 // states in the wild do have numeric starts
 // state_name = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
-state_name = @{ (ASCII_ALPHANUMERIC | "_")+ }
+state_name = @{ ( !"." ~ (ASCII_ALPHANUMERIC | "_"))+ }
 
 // Rules
 // rules = { (rule ~ NEWLINE)+ }
@@ -33,12 +33,12 @@ indentation = _{ " "+ }
 rule_match = @{ "^" ~ (!("-> " | NEWLINE) ~ ANY)* }
 rule_transition = _{ "-> " ~ transition_action }
 
-transition_action = { (line_rec_action ~ next_state? ) | next_state }
-line_rec_action = @{ err_state | line_action ~ ( "." ~ record_action)? | record_action }
-line_action = { "Next" | "Continue" }
-record_action = { "NoRecord" | "Record" | "Clear" | "Clearall" }
-next_state = { "End" | state_name }
-err_state = { "Error" ~ WHITESPACE+ ~ err_msg? }
+transition_action = ${ (line_rec_action ~ next_state? ) | next_state }
+line_rec_action = _{ err_state | line_action ~ ( "." ~ record_action)? | record_action }
+line_action = !{ "Next" | "Continue" }
+record_action = !{ "NoRecord" | "Record" | "Clear" | "Clearall" }
+next_state = !{ state_name }
+err_state = !{ "Error" ~ err_msg? }
 err_msg = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 space = _{ " " }
 
