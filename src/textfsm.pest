@@ -31,15 +31,14 @@ rule = { indentation? ~ rule_match ~ rule_transition? }
 indentation = _{ " "+ }
 // rule_match = @{ "^" ~ (!" ->" ~ ANY)* }
 rule_match = @{ "^" ~ (!("-> " | NEWLINE) ~ ANY)* }
-rule_transition = { "-> " ~ transition_actions }
-transition_actions = { transition_action+ }
+rule_transition = _{ "-> " ~ transition_action }
 
 transition_action = { (line_rec_action ~ next_state? ) | next_state }
-line_rec_action = { err_state | line_action ~ ( "." ~ record_action)? | record_action }
+line_rec_action = @{ err_state | line_action ~ ( "." ~ record_action)? | record_action }
 line_action = { "Next" | "Continue" }
 record_action = { "NoRecord" | "Record" | "Clear" | "Clearall" }
 next_state = { "End" | state_name }
-err_state = { "Error" ~ err_msg? }
+err_state = { "Error" ~ WHITESPACE+ ~ err_msg? }
 err_msg = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 space = _{ " " }
 
