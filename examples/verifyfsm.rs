@@ -52,7 +52,7 @@ fn main() {
             for (i, irec) in yaml_map.parsed_sample.iter().enumerate() {
                 let mut vo: Vec<String> = vec![];
                 for (k, _v) in irec {
-                    if result[i].get(k).is_none() {
+                    if i >= result.len() || result[i].get(k).is_none() {
                         vo.push(k.clone());
                     }
                 }
