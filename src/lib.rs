@@ -639,8 +639,8 @@ impl TextFSM {
         conversion: Option<DataRecordConversion>,
     ) -> Vec<DataRecord> {
         let input = std::fs::read_to_string(&fname).expect("Data file read failed");
-        for aline in input.lines() {
-            debug!("LINE:'{}'", &aline);
+        for (lineno, aline) in input.lines().enumerate() {
+            debug!("LINE:#{}:'{}'", lineno+1, &aline);
             if let Some(next_state) = self.parse_line(&aline) {
                 match next_state {
                     NextState::Error(maybe_msg) => {
