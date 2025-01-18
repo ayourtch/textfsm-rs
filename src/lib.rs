@@ -182,6 +182,43 @@ impl TextFSM {
                             }
                         }
                         println!("OUT_STR: {}", out_str);
+                        let regex_val = Regex::new(&out_str);
+
+                        if regex_val.is_err() {
+                            use fancy_regex::Error;
+                            use fancy_regex::ParseError;
+                            let mut out_str = out_str;
+                            loop {
+                                let fancy_regex = fancy_regex::Regex::new(&out_str);
+                                match fancy_regex {
+                                    Ok(x) => {
+                                        break;
+                                    }
+                                    Err(Error::ParseError(pos, e)) => {
+                                        println!("STR:{}", &out_str[0..pos + 1]);
+                                        println!("ERR:{}^", " ".repeat(pos));
+                                        match e {
+                                            ParseError::TargetNotRepeatable => {
+                                                if let Some(char_index) =
+                                                    out_str.char_indices().nth(pos)
+                                                {
+                                                    println!("WARNING: repeat quantifier on a lookahead, lookbehind or other zero-width item");
+                                                    out_str.remove(char_index.0);
+                                                } else {
+                                                    panic!("Can not fix up regex!");
+                                                }
+                                            }
+                                            e => {
+                                                panic!("Error: {:?}", &e);
+                                            }
+                                        }
+                                    }
+                                    x => {
+                                        panic!("Error: {:?}", &x);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 x => {
