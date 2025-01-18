@@ -8,3 +8,6 @@ pest = "*"
 pest_derive ="*"
 regex = "*"
 fancy-regex = "*"
+serde = { version = "*", features = ["derive"] }
+serde_yaml = "*"
+
