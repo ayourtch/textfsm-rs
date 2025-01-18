@@ -6,11 +6,24 @@ use std::collections::HashMap;
 
 pub mod varsubst;
 
-#[derive(Parser)]
-#[grammar = "textfsm.pest"]
-pub struct TextFSMParser;
+type DataRecord = HashMap<String, String>;
 
-pub struct TextFSM {}
+#[derive(Parser, Debug, Default, Clone)]
+#[grammar = "textfsm.pest"]
+pub struct TextFSMParser {
+    pub values: HashMap<String, ValueDefinition>,
+    pub states: HashMap<String, StateCompiled>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct TextFSM {
+    pub parser: TextFSMParser,
+    pub curr_state: String,
+    pub curr_rule: usize,
+    pub curr_record: DataRecord,
+    pub filldown_record: DataRecord,
+    pub records: Vec<DataRecord>,
+}
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub enum LineAction {
@@ -41,13 +54,13 @@ pub struct RuleTransition {
     maybe_next_state: Option<NextState>,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct StateRule {
     rule_match: String,
     transition: RuleTransition,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct ValueDefinition {
     name: String,
     regex_pattern: String,
@@ -75,7 +88,7 @@ pub struct StateCompiled {
     rules: Vec<StateRuleCompiled>,
 }
 
-impl TextFSM {
+impl TextFSMParser {
     fn print_pair(indent: usize, pair: &Pair<'_, Rule>) {
         // println!("Debug: {:#?}", &pair);
         let spaces = " ".repeat(indent);
@@ -338,13 +351,14 @@ impl TextFSM {
         Ok(vals)
     }
     pub fn from_file(fname: &str) -> Self {
-        println!("Path: {}", &fname);
+        // println!("Path: {}", &fname);
         let template = std::fs::read_to_string(&fname).expect("File read failed");
         // pad with a newline, because dealing with a missing one within grammar is a PITA
         let template = format!("{}\n", template);
 
         let mut seen_eoi = false;
         let mut values: HashMap<String, ValueDefinition> = HashMap::new();
+        let mut states: HashMap<String, StateCompiled> = HashMap::new();
 
         match TextFSMParser::parse(Rule::file, &template) {
             Ok(pairs) => {
@@ -365,9 +379,21 @@ impl TextFSM {
                     }
                     // Self::process_pair(0, &pair);
                 }
-                return TextFSM {};
+                return TextFSMParser { values, states };
             }
             Err(e) => panic!("file {} Error: {}", &fname, e),
+        }
+    }
+}
+
+impl TextFSM {
+    pub fn from_file(fname: &str) -> Self {
+        let parser = TextFSMParser::from_file(fname);
+        let curr_state = format!("Start");
+        TextFSM {
+            parser,
+            curr_state,
+            ..Default::default()
         }
     }
 }

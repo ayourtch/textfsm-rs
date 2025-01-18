@@ -193,7 +193,7 @@ fn print_pair(indent: usize, pair: &Pair<'_, Rule>) {
 
 fn main() {
     for arg in std::env::args().skip(1) {
-        println!("Reading file {}", &arg);
+        // println!("Reading file {}", &arg);
         let template = std::fs::read_to_string(&arg).expect("File read failed");
         let template = format!("{}\n", template);
 
