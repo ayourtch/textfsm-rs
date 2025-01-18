@@ -92,6 +92,11 @@ pub struct StateCompiled {
     rules: Vec<StateRuleCompiled>,
 }
 
+#[derive(Debug, Clone)]
+pub enum DataRecordConversion {
+    LowercaseKeys,
+}
+
 impl TextFSMParser {
     /*
     fn print_pair(indent: usize, pair: &Pair<'_, Rule>) {
@@ -591,7 +596,25 @@ impl TextFSM {
         maybe_next_state
     }
 
-    pub fn parse_file(&mut self, fname: &str) -> Vec<DataRecord> {
+    pub fn lowercase_keys(src: &Vec<DataRecord>) -> Vec<DataRecord> {
+        let mut out = vec![];
+
+        for irec in src {
+            let mut hm = DataRecord::new();
+            for (k, v) in irec {
+                let kl = k.to_lowercase();
+                hm.insert(kl, v.clone());
+            }
+            out.push(hm);
+        }
+        out
+    }
+
+    pub fn parse_file(
+        &mut self,
+        fname: &str,
+        conversion: Option<DataRecordConversion>,
+    ) -> Vec<DataRecord> {
         let input = std::fs::read_to_string(&fname).expect("Data file read failed");
         for aline in input.lines() {
             // println!("LINE: {}", &aline);
@@ -615,6 +638,9 @@ impl TextFSM {
             // FIXME: Can EOF state transition into something else ? Presumably not.
             self.set_curr_state("End");
         }
-        self.records.clone()
+        match conversion {
+            None => self.records.clone(),
+            Some(DataRecordConversion::LowercaseKeys) => Self::lowercase_keys(&self.records),
+        }
     }
 }

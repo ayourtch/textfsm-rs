@@ -7,20 +7,6 @@ struct ParsedSample {
     parsed_sample: Vec<HashMap<String, String>>,
 }
 
-fn lowercase_keys(src: &Vec<HashMap<String, String>>) -> Vec<HashMap<String, String>> {
-    let mut out = vec![];
-
-    for irec in src {
-        let mut hm = HashMap::new();
-        for (k, v) in irec {
-            let kl = k.to_lowercase();
-            hm.insert(kl, v.clone());
-        }
-        out.push(hm);
-    }
-    out
-}
-
 fn main() {
     let template_name = std::env::args()
         .nth(1)
@@ -35,9 +21,8 @@ fn main() {
     let yaml = std::fs::read_to_string(&yaml_verify_name).expect("YAML File read failed");
     let yaml_map: ParsedSample = serde_yaml::from_str(&yaml).expect("YAML deserialize failed");
 
-    let result = textfsm.parse_file(&data_name);
-    println!("RAW RESULT: {:?}\n", &result);
-    let result = lowercase_keys(&result);
+    let result = textfsm.parse_file(&data_name, Some(DataRecordConversion::LowercaseKeys));
+    println!("RESULT: {:?}\n", &result);
     if result == yaml_map.parsed_sample {
         println!("Parsed result matches YAML");
     } else {
