@@ -504,17 +504,18 @@ impl TextFSM {
                 match &rule.maybe_regex {
                     Some(MultiRegex::Classic(rx)) => {
                         if let Some(caps) = rx.captures(aline) {
-                            // println!("RULE(CLASSIC REGEX): {:?}", &rule);
+                            println!("RULE(CLASSIC REGEX): {:?}", &rule);
                             for var in &rule.match_variables {
                                 if let Some(value) = caps.name(var) {
                                     // println!("CLASSIC SET VAR '{}' = '{}'", &var, &value.as_str());
                                     self.curr_record
                                         .insert(var.clone(), value.as_str().to_string());
                                 } else {
-                                    panic!(
-                                        "Classic Could not capture '{}' from string '{}'",
+                                    println!(
+                                        "WARNING: Classic Could not capture '{}' from string '{}'",
                                         var, aline
                                     );
+                                    self.curr_record.insert(var.clone(), format!(""));
                                 }
                             }
                             transition = rule.transition.clone();
@@ -529,10 +530,11 @@ impl TextFSM {
                                     self.curr_record
                                         .insert(var.clone(), value.as_str().to_string());
                                 } else {
-                                    panic!(
-                                        "Fancy Could not capture '{}' from string '{}'",
+                                    println!(
+                                        "WARNING: Fancy Could not capture '{}' from string '{}'",
                                         var, aline
                                     );
+                                    self.curr_record.insert(var.clone(), format!(""));
                                 }
                             }
                             transition = rule.transition.clone();
