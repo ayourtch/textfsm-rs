@@ -197,9 +197,13 @@ impl TextFSMParser {
             );
             rule_match = rule_match.trim_end().to_string();
         }
-        if rule_match.contains("\\<") {
+        if rule_match.contains(r#"\<"#) {
             println!("WARNING: replacing \\< with < in '{}'", &rule_match);
             rule_match = rule_match.replace("\\<", "<");
+        }
+        if rule_match.contains(r#"\>"#) {
+            println!("WARNING: replacing \\> with > in '{}'", &rule_match);
+            rule_match = rule_match.replace("\\>", ">");
         }
         StateRule {
             rule_match,
@@ -360,7 +364,15 @@ impl TextFSMParser {
             }
             // Self::print_pair(indent + 2, &p);
         }
-        if let (Some(name), Some(regex_pattern)) = (name.clone(), regex_pattern.clone()) {
+        if let (Some(name), Some(mut regex_pattern)) = (name.clone(), regex_pattern.clone()) {
+            if regex_pattern.contains(r#"\<"#) {
+                println!("WARNING: replacing \\< with < in value '{}'", &name);
+                regex_pattern = regex_pattern.replace("\\<", "<");
+            }
+            if regex_pattern.contains(r#"\>"#) {
+                println!("WARNING: replacing \\> with > in value '{}'", &name);
+                regex_pattern = regex_pattern.replace("\\>", ">");
+            }
             Ok(ValueDefinition {
                 name,
                 regex_pattern,
