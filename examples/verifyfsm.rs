@@ -36,9 +36,10 @@ fn main() {
     let yaml_map: ParsedSample = serde_yaml::from_str(&yaml).expect("YAML deserialize failed");
 
     let result = textfsm.parse_file(&data_name);
-    println!("RAW RESULT: {:?}", &result);
+    println!("RAW RESULT: {:?}\n", &result);
     let result = lowercase_keys(&result);
     if result == yaml_map.parsed_sample {
+        println!("Parsed result matches YAML");
     } else {
         println!("Results differ");
         println!("Records: {:?}", &result);

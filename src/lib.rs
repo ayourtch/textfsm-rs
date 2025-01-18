@@ -496,13 +496,13 @@ impl TextFSM {
             for rule in &curr_state.rules {
                 let mut transition: RuleTransition = Default::default();
                 transition.line_action = LineAction::Continue;
-                // XXX
                 match &rule.maybe_regex {
                     Some(MultiRegex::Classic(rx)) => {
                         if let Some(caps) = rx.captures(aline) {
+                            // println!("RULE(CLASSIC REGEX): {:?}", &rule);
                             for var in &rule.match_variables {
                                 if let Some(value) = caps.name(var) {
-                                    // println!("SET VAR '{}' = '{}'", &var, &value.as_str());
+                                    // println!("CLASSIC SET VAR '{}' = '{}'", &var, &value.as_str());
                                     self.curr_record
                                         .insert(var.clone(), value.as_str().to_string());
                                 } else {
@@ -517,14 +517,15 @@ impl TextFSM {
                     }
                     Some(MultiRegex::Fancy(rx)) => {
                         if let Ok(Some(caps)) = rx.captures(aline) {
+                            // println!("RULE(FANCY REGEX): {:?}", &rule);
                             for var in &rule.match_variables {
                                 if let Some(value) = caps.name(var) {
-                                    // println!("SET VAR '{}' = '{}'", &var, &value.as_str());
+                                    // println!("FANCY SET VAR '{}' = '{}'", &var, &value.as_str());
                                     self.curr_record
                                         .insert(var.clone(), value.as_str().to_string());
                                 } else {
                                     panic!(
-                                        "Classic Could not capture '{}' from string '{}'",
+                                        "Fancy Could not capture '{}' from string '{}'",
                                         var, aline
                                     );
                                 }
@@ -536,8 +537,8 @@ impl TextFSM {
                         panic!("Regex {:?} on rule is not supported", &x);
                     }
                 }
-
                 // println!("TRANS: {:?}", &transition);
+
                 match transition.record_action {
                     RecordAction::Record => {
                         let mut mandatory_count = 0;
@@ -547,8 +548,16 @@ impl TextFSM {
                             }
                         }
                         if mandatory_count == self.parser.mandatory_values.len() {
-                            let mut new_rec = Default::default();
+                            let mut new_rec: HashMap<String, String> = Default::default();
                             std::mem::swap(&mut new_rec, &mut self.curr_record);
+                            // Set the values that aren't set yet - FIXME: this feature should be
+                            // possible to be disabled as "" and nothing are very different things.
+                            for (k, v) in &self.parser.values {
+                                if new_rec.get(&v.name).is_none() {
+                                    new_rec.insert(v.name.clone(), format!(""));
+                                }
+                            }
+                            // println!("RECORD: {:?}", &new_rec);
                             self.records.push(new_rec);
                         } else {
                             // println!("RECORD: no required fields set");
