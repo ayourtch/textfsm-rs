@@ -33,7 +33,7 @@ indentation = _{ " "+ }
 rule_match = { "^" ~ (!(" -> " | NEWLINE) ~ ANY)* }
 rule_transition = _{ " -> " ~ WHITESPACE* ~ transition_action }
 
-transition_action = ${ (line_rec_action ~ next_state? ) | next_state }
+transition_action = ${ (line_rec_action ~ (WHITESPACE+ ~ next_state)? ) | next_state }
 // hide line_rec_action - transition_action is atomic, so no whitespace handling here!
 line_rec_action = _{ err_state | line_action ~ ( "." ~ record_action)? | record_action }
 line_action = !{ "Next" | "Continue" }

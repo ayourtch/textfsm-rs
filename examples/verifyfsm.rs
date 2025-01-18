@@ -8,6 +8,8 @@ struct ParsedSample {
 }
 
 fn main() {
+    env_logger::init();
+
     let template_name = std::env::args()
         .nth(1)
         .expect("Missing TextFSM template file name");

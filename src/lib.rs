@@ -1,3 +1,4 @@
+use log::{debug, error, info, log_enabled, trace, Level};
 pub use pest::iterators::Pair;
 pub use pest::Parser;
 use pest_derive::Parser;
@@ -98,18 +99,16 @@ pub enum DataRecordConversion {
 }
 
 impl TextFSMParser {
-    /*
-    fn print_pair(indent: usize, pair: &Pair<'_, Rule>) {
+    fn _log_pair(indent: usize, pair: &Pair<'_, Rule>) {
         // println!("Debug: {:#?}", &pair);
         let spaces = " ".repeat(indent);
-        println!("{}Rule:    {:?}", spaces, pair.as_rule());
-        println!("{}Span:    {:?}", spaces, pair.as_span());
-        println!("{}Text:    {}", spaces, pair.as_str());
+        trace!("{}Rule:    {:?}", spaces, pair.as_rule());
+        trace!("{}Span:    {:?}", spaces, pair.as_span());
+        trace!("{}Text:    {}", spaces, pair.as_str());
         for p in pair.clone().into_inner() {
-            Self::print_pair(indent + 2, &p);
+            Self::_log_pair(indent + 2, &p);
         }
     }
-    */
     pub fn parse_state_rule_transition(pair: &Pair<'_, Rule>) -> RuleTransition {
         let mut record_action: RecordAction = Default::default();
         let mut line_action: LineAction = Default::default();
@@ -295,7 +294,7 @@ impl TextFSMParser {
                 Rule::rules => {
                     for pair in pair.clone().into_inner() {
                         let rule = Self::parse_state_rule(&pair);
-                        // println!("RULE: {:#?}", &rule);
+                        trace!("PARSED RULE [{:?}]: {:#?}", &name, &rule);
                         let compiled_rule = Self::compile_state_rule(&rule, values).unwrap();
                         rules.push(compiled_rule);
                     }
@@ -383,7 +382,7 @@ impl TextFSMParser {
         // println!("Path: {}", &fname);
         let template = std::fs::read_to_string(&fname).expect("File read failed");
         // pad with a newline, because dealing with a missing one within grammar is a PITA
-        let template = format!("{}\n", template);
+        let template = format!("{}\n\n\n", template);
 
         let mut seen_eoi = false;
         let mut values: HashMap<String, ValueDefinition> = HashMap::new();
@@ -418,10 +417,21 @@ impl TextFSMParser {
                             for pair in pair.clone().into_inner() {
                                 match pair.as_rule() {
                                     Rule::state_definition => {
+                                        trace!("STATE DEFINITION");
+                                        Self::_log_pair(0, &pair);
                                         let state = Self::parse_and_compile_state_definition(
                                             &pair, &values,
                                         )
                                         .unwrap();
+                                        trace!("STATE DEFINITION END: {:?}", &state);
+                                        if &state.name != "EOF" {
+                                            if states.get(&state.name).is_some() {
+                                                panic!(
+                                                    "State {} already defined in the file!",
+                                                    &state.name
+                                                );
+                                            }
+                                        }
                                         states.insert(state.name.clone(), state);
                                     }
                                     x => {
@@ -498,13 +508,15 @@ impl TextFSM {
         let curr_state = self.curr_state.clone();
 
         if let Some(ref curr_state) = self.parser.states.get(&curr_state) {
+            trace!("CURR STATE: {:?}", &curr_state);
             for rule in &curr_state.rules {
                 let mut transition: RuleTransition = Default::default();
                 transition.line_action = LineAction::Continue;
+                trace!("TRY RULE: {:?}", &rule);
                 match &rule.maybe_regex {
                     Some(MultiRegex::Classic(rx)) => {
                         if let Some(caps) = rx.captures(aline) {
-                            println!("RULE(CLASSIC REGEX): {:?}", &rule);
+                            debug!("RULE(CLASSIC REGEX): {:?}", &rule);
                             for var in &rule.match_variables {
                                 if let Some(value) = caps.name(var) {
                                     // println!("CLASSIC SET VAR '{}' = '{}'", &var, &value.as_str());
@@ -619,7 +631,7 @@ impl TextFSM {
     ) -> Vec<DataRecord> {
         let input = std::fs::read_to_string(&fname).expect("Data file read failed");
         for aline in input.lines() {
-            // println!("LINE: {}", &aline);
+            debug!("LINE:'{}'", &aline);
             if let Some(next_state) = self.parse_line(&aline) {
                 match next_state {
                     NextState::Error(maybe_msg) => {
