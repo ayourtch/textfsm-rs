@@ -26,11 +26,16 @@ pub struct TextFSM {
     pub records: Vec<DataRecord>,
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LineAction {
-    #[default]
     Continue,
-    Next,
+    Next(Option<NextState>),
+}
+
+impl Default for LineAction {
+    fn default() -> LineAction {
+        LineAction::Next(None)
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -52,7 +57,6 @@ pub enum NextState {
 pub struct RuleTransition {
     line_action: LineAction,
     record_action: RecordAction,
-    maybe_next_state: Option<NextState>,
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -119,7 +123,7 @@ impl TextFSMParser {
                 Rule::line_action => {
                     line_action = match pair.as_str() {
                         "Continue" => LineAction::Continue,
-                        "Next" => LineAction::Next,
+                        "Next" => LineAction::Next(None),
                         x => panic!("Record action {} not supported", x),
                     };
                 }
@@ -133,7 +137,16 @@ impl TextFSMParser {
                     maybe_next_state = Some(NextState::Error(maybe_err_msg));
                 }
                 Rule::next_state => {
-                    maybe_next_state = Some(NextState::NamedState(pair.as_str().to_string()));
+                    if line_action == LineAction::Next(None) {
+                        let next_state = NextState::NamedState(pair.as_str().to_string());
+                        line_action = LineAction::Next(Some(next_state));
+                    } else {
+                        panic!(
+                            "Line action {:?} does not support next state (attempted {:?})",
+                            &line_action,
+                            pair.as_str()
+                        );
+                    }
                 }
                 x => {
                     panic!("Rule {:?} not supported!", &x);
@@ -143,7 +156,6 @@ impl TextFSMParser {
         RuleTransition {
             record_action,
             line_action,
-            maybe_next_state,
         }
     }
     pub fn parse_state_rule(pair: &Pair<'_, Rule>) -> StateRule {
@@ -366,6 +378,23 @@ impl TextFSMParser {
         let mut states: HashMap<String, StateCompiled> = HashMap::new();
         let mut mandatory_values: Vec<String> = vec![];
 
+        let end_state = NextState::NamedState(format!("End"));
+        let eof_rule = StateRule {
+            rule_match: format!(".*"),
+            transition: RuleTransition {
+                line_action: LineAction::Next(Some(end_state)),
+                record_action: RecordAction::Record,
+            },
+        };
+
+        let compiled_eof_rule = Self::compile_state_rule(&eof_rule, &values).unwrap();
+
+        let eof_state = StateCompiled {
+            name: format!("EOF"),
+            rules: vec![compiled_eof_rule],
+        };
+        states.insert(eof_state.name.clone(), eof_state);
+
         match TextFSMParser::parse(Rule::file, &template) {
             Ok(pairs) => {
                 for pair in pairs.clone() {
@@ -398,6 +427,8 @@ impl TextFSMParser {
                     }
                     // Self::process_pair(0, &pair);
                 }
+
+                // FIXME: check that the "Start" state exists
                 return TextFSMParser {
                     values,
                     mandatory_values,
