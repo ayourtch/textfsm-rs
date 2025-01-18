@@ -12,14 +12,14 @@ pub struct TextFSMParser;
 
 pub struct TextFSM {}
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub enum LineAction {
     #[default]
     Continue,
     Next,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub enum RecordAction {
     #[default]
     NoRecord,
@@ -28,13 +28,13 @@ pub enum RecordAction {
     Clearall,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum NextState {
     Error(Option<String>),
     NamedState(String),
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct RuleTransition {
     line_action: LineAction,
     record_action: RecordAction,
@@ -52,6 +52,27 @@ pub struct ValueDefinition {
     name: String,
     regex_pattern: String,
     options: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum MultiRegex {
+    Classic(regex::Regex),
+    Fancy(fancy_regex::Regex),
+}
+
+#[derive(Debug, Clone)]
+pub struct StateRuleCompiled {
+    rule_match: String,
+    expanded_rule_match: String,
+    match_variables: Vec<String>,
+    maybe_regex: Option<MultiRegex>,
+    transition: RuleTransition,
+}
+
+#[derive(Debug, Clone)]
+pub struct StateCompiled {
+    name: String,
+    rules: Vec<StateRuleCompiled>,
 }
 
 impl TextFSM {
@@ -141,84 +162,108 @@ impl TextFSM {
             transition,
         }
     }
-    pub fn parse_state_definition(
+
+    pub fn compile_state_rule(
+        rule: &StateRule,
+        values: &HashMap<String, ValueDefinition>,
+    ) -> Result<StateRuleCompiled, String> {
+        let mut expanded_rule_match: String = format!("");
+        let rule_match = rule.rule_match.clone();
+        let mut match_variables: Vec<String> = vec![];
+        let varsubst = varsubst::VariableParser::parse_dollar_string(&rule_match).unwrap();
+        // println!("DOLLAR STR: {:?}", &varsubst);
+        {
+            use varsubst::ParseChunk;
+            for i in &varsubst {
+                match i {
+                    ParseChunk::DollarDollar => expanded_rule_match.push('$'),
+                    ParseChunk::Text(s) => expanded_rule_match.push_str(s),
+                    ParseChunk::Variable(v) => match values.get(v) {
+                        Some(val) => {
+                            let v_out = format!("(?P<{}>{})", v, val.regex_pattern);
+                            expanded_rule_match.push_str(&v_out);
+                            match_variables.push(v.to_string());
+                        }
+                        None => panic!(
+                            "Can not find variable '{}' while parsing rule_match '{}'",
+                            &v, &rule.rule_match
+                        ),
+                    },
+                }
+            }
+        }
+        // println!("OUT_STR: {}", expanded_rule_match);
+
+        let regex_val = match Regex::new(&expanded_rule_match) {
+            Ok(r) => MultiRegex::Classic(r),
+            Err(e) => {
+                use fancy_regex::Error;
+                use fancy_regex::ParseError;
+
+                let freg = loop {
+                    let fancy_regex = fancy_regex::Regex::new(&expanded_rule_match);
+                    match fancy_regex {
+                        Ok(x) => {
+                            break x;
+                        }
+                        Err(Error::ParseError(pos, e)) => {
+                            println!("STR:{}", &expanded_rule_match[0..pos + 1]);
+                            println!("ERR:{}^", " ".repeat(pos));
+                            match e {
+                                ParseError::TargetNotRepeatable => {
+                                    if let Some(char_index) =
+                                        expanded_rule_match.char_indices().nth(pos)
+                                    {
+                                        println!("WARNING: repeat quantifier on a lookahead, lookbehind or other zero-width item");
+                                        expanded_rule_match.remove(char_index.0);
+                                    } else {
+                                        panic!("Can not fix up regex!");
+                                    }
+                                }
+                                e => {
+                                    panic!("Error: {:?}", &e);
+                                }
+                            }
+                        }
+                        x => {
+                            panic!("Error: {:?}", &x);
+                        }
+                    }
+                };
+                MultiRegex::Fancy(freg)
+            }
+        };
+        let maybe_regex = Some(regex_val);
+        let transition = rule.transition.clone();
+
+        Ok(StateRuleCompiled {
+            rule_match,
+            expanded_rule_match,
+            match_variables,
+            maybe_regex,
+            transition,
+        })
+    }
+    pub fn parse_and_compile_state_definition(
         pair: &Pair<'_, Rule>,
         values: &HashMap<String, ValueDefinition>,
-    ) {
-        let mut state_name: Option<String> = None;
+    ) -> Result<StateCompiled, String> {
+        let mut name: Option<String> = None;
         // Self::print_pair(20, pair);
+        let mut rules: Vec<StateRuleCompiled> = vec![];
 
         for pair in pair.clone().into_inner() {
             match pair.as_rule() {
                 Rule::state_header => {
-                    state_name = Some(pair.as_str().to_string());
+                    name = Some(pair.as_str().to_string());
                     // println!("SET STATE NAME: {:?}", &state_name);
                 }
                 Rule::rules => {
                     for pair in pair.clone().into_inner() {
-                        let mut out_str: String = format!("");
                         let rule = Self::parse_state_rule(&pair);
-                        println!("RULE: {:#?}", &rule);
-                        let varsubst =
-                            varsubst::VariableParser::parse_dollar_string(&rule.rule_match)
-                                .unwrap();
-                        println!("DOLLAR STR: {:?}", &varsubst);
-                        {
-                            use varsubst::ParseChunk;
-                            for i in &varsubst {
-                                match i {
-                                    ParseChunk::DollarDollar => out_str.push('$'),
-                                    ParseChunk::Text(s) => out_str.push_str(s),
-                                    ParseChunk::Variable(v) => {
-                                        match values.get(v) {
-                                            Some(val) => {
-                                                let v_out = format!("(?P<{}>{})", v, val.regex_pattern);
-                                                out_str.push_str(&v_out);
-                                            },
-                                            None => panic!("Can not find variable '{}' while parsing rule_match '{}'", &v, &rule.rule_match),
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        println!("OUT_STR: {}", out_str);
-                        let regex_val = Regex::new(&out_str);
-
-                        if regex_val.is_err() {
-                            use fancy_regex::Error;
-                            use fancy_regex::ParseError;
-                            let mut out_str = out_str;
-                            loop {
-                                let fancy_regex = fancy_regex::Regex::new(&out_str);
-                                match fancy_regex {
-                                    Ok(x) => {
-                                        break;
-                                    }
-                                    Err(Error::ParseError(pos, e)) => {
-                                        println!("STR:{}", &out_str[0..pos + 1]);
-                                        println!("ERR:{}^", " ".repeat(pos));
-                                        match e {
-                                            ParseError::TargetNotRepeatable => {
-                                                if let Some(char_index) =
-                                                    out_str.char_indices().nth(pos)
-                                                {
-                                                    println!("WARNING: repeat quantifier on a lookahead, lookbehind or other zero-width item");
-                                                    out_str.remove(char_index.0);
-                                                } else {
-                                                    panic!("Can not fix up regex!");
-                                                }
-                                            }
-                                            e => {
-                                                panic!("Error: {:?}", &e);
-                                            }
-                                        }
-                                    }
-                                    x => {
-                                        panic!("Error: {:?}", &x);
-                                    }
-                                }
-                            }
-                        }
+                        // println!("RULE: {:#?}", &rule);
+                        let compiled_rule = Self::compile_state_rule(&rule, values).unwrap();
+                        rules.push(compiled_rule);
                     }
                 }
                 x => {
@@ -230,14 +275,16 @@ impl TextFSM {
                 }
             }
         }
-        println!("STATE: {:?}", &state_name);
+        let name = name.expect("internal error - state must have a name");
+        Ok(StateCompiled { name, rules })
     }
     pub fn parse_state_defs(pair: &Pair<'_, Rule>, values: &HashMap<String, ValueDefinition>) {
-        println!("=== STATE DEFINITIONS ===");
+        // println!("=== STATE DEFINITIONS ===");
         for pair in pair.clone().into_inner() {
             match pair.as_rule() {
                 Rule::state_definition => {
-                    let state = Self::parse_state_definition(&pair, values);
+                    let state = Self::parse_and_compile_state_definition(&pair, values).unwrap();
+                    // println!("Compiled state: {:#?}", &state);
                 }
                 x => {
                     panic!("state definition rule {:?} not supported", x);
