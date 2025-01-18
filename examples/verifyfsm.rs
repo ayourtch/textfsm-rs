@@ -24,8 +24,7 @@ fn main() {
     let result = textfsm.parse_file(&data_name, Some(DataRecordConversion::LowercaseKeys));
     println!("RESULT: {:?}\n", &result);
 
-    if let Ok(yaml_map) = serde_yaml::from_str::<ParsedSample>(&yaml)
-    {
+    if let Ok(yaml_map) = serde_yaml::from_str::<ParsedSample>(&yaml) {
         if result == yaml_map.parsed_sample {
             println!("Parsed result matches YAML");
         } else {
