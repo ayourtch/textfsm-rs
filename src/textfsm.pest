@@ -36,7 +36,7 @@ transition_action = ${ (line_rec_action ~ (WHITESPACE+ ~ next_state)? ) | next_s
 // hide line_rec_action - transition_action is atomic, so no whitespace handling here!
 line_rec_action = _{ err_state | line_action ~ ( "." ~ record_action)? | record_action }
 line_action = !{ "Next" | "Continue" }
-record_action = !{ "NoRecord" | "Record" | "Clear" | "Clearall" }
+record_action = !{ "NoRecord" | "Record" | "Clearall" | "Clear" }
 next_state = !{ state_name }
 err_state = !{ "Error" ~ err_msg? }
 err_msg = @{ ("\"" ~ (!"\"" ~ ANY)* ~ "\"") | (!(WHITESPACE | NEWLINE) ~ ANY)* }
