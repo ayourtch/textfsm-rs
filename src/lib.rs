@@ -12,6 +12,7 @@ type DataRecord = HashMap<String, String>;
 #[grammar = "textfsm.pest"]
 pub struct TextFSMParser {
     pub values: HashMap<String, ValueDefinition>,
+    pub mandatory_values: Vec<String>,
     pub states: HashMap<String, StateCompiled>,
 }
 
@@ -340,15 +341,19 @@ impl TextFSMParser {
     }
     pub fn parse_value_defs(
         pair: &Pair<'_, Rule>,
-    ) -> Result<HashMap<String, ValueDefinition>, String> {
+    ) -> Result<(HashMap<String, ValueDefinition>, Vec<String>), String> {
         let mut vals = HashMap::new();
+        let mut mandatory_values: Vec<String> = vec![];
         for pair in pair.clone().into_inner() {
             if Rule::value_definition == pair.as_rule() {
                 let val = Self::parse_value_definition(&pair)?;
+                if let Some(ref opts) = val.options {
+                    mandatory_values.push(val.name.clone());
+                }
                 vals.insert(val.name.clone(), val);
             }
         }
-        Ok(vals)
+        Ok((vals, mandatory_values))
     }
     pub fn from_file(fname: &str) -> Self {
         // println!("Path: {}", &fname);
@@ -359,21 +364,23 @@ impl TextFSMParser {
         let mut seen_eoi = false;
         let mut values: HashMap<String, ValueDefinition> = HashMap::new();
         let mut states: HashMap<String, StateCompiled> = HashMap::new();
+        let mut mandatory_values: Vec<String> = vec![];
 
         match TextFSMParser::parse(Rule::file, &template) {
             Ok(pairs) => {
                 for pair in pairs.clone() {
                     match pair.as_rule() {
                         Rule::value_definitions => {
-                            values = Self::parse_value_defs(&pair).unwrap();
+                            (values, mandatory_values) = Self::parse_value_defs(&pair).unwrap();
                         }
                         Rule::state_definitions => {
                             for pair in pair.clone().into_inner() {
                                 match pair.as_rule() {
                                     Rule::state_definition => {
-                                        let state =
-                                            Self::parse_and_compile_state_definition(&pair, &values)
-                                                .unwrap();
+                                        let state = Self::parse_and_compile_state_definition(
+                                            &pair, &values,
+                                        )
+                                        .unwrap();
                                         states.insert(state.name.clone(), state);
                                     }
                                     x => {
@@ -391,7 +398,11 @@ impl TextFSMParser {
                     }
                     // Self::process_pair(0, &pair);
                 }
-                return TextFSMParser { values, states };
+                return TextFSMParser {
+                    values,
+                    mandatory_values,
+                    states,
+                };
             }
             Err(e) => panic!("file {} Error: {}", &fname, e),
         }
