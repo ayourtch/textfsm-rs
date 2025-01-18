@@ -574,25 +574,31 @@ impl TextFSM {
                 match transition.record_action {
                     RecordAction::Record => {
                         let mut mandatory_count = 0;
+                        let number_of_values = self.curr_record.keys().len();
+
                         for k in &self.parser.mandatory_values {
                             if self.curr_record.get(k).is_some() {
                                 mandatory_count += 1;
                             }
                         }
-                        if mandatory_count == self.parser.mandatory_values.len() {
-                            let mut new_rec: HashMap<String, String> = Default::default();
-                            std::mem::swap(&mut new_rec, &mut self.curr_record);
-                            // Set the values that aren't set yet - FIXME: this feature should be
-                            // possible to be disabled as "" and nothing are very different things.
-                            for (_k, v) in &self.parser.values {
-                                if new_rec.get(&v.name).is_none() {
-                                    new_rec.insert(v.name.clone(), format!(""));
+                        if number_of_values > 0 {
+                            if mandatory_count == self.parser.mandatory_values.len() {
+                                let mut new_rec: HashMap<String, String> = Default::default();
+                                std::mem::swap(&mut new_rec, &mut self.curr_record);
+                                // Set the values that aren't set yet - FIXME: this feature should be
+                                // possible to be disabled as "" and nothing are very different things.
+                                for (_k, v) in &self.parser.values {
+                                    if new_rec.get(&v.name).is_none() {
+                                        new_rec.insert(v.name.clone(), format!(""));
+                                    }
                                 }
+                                trace!("RECORD: {:?}", &new_rec);
+                                self.records.push(new_rec);
+                            } else {
+                                trace!("RECORD: no required fields set");
                             }
-                            // println!("RECORD: {:?}", &new_rec);
-                            self.records.push(new_rec);
                         } else {
-                            // println!("RECORD: no required fields set");
+                            trace!("RECORD: record is empty, not dumping");
                         }
                     }
                     RecordAction::NoRecord => {}
