@@ -190,7 +190,7 @@ impl TextFSMParser {
             }
         }
         let mut rule_match = rule_match.expect("rule_match must be always set");
-        if (rule_match.ends_with(" ") || rule_match.ends_with("\t"))&& !has_action {
+        if (rule_match.ends_with(" ") || rule_match.ends_with("\t")) && !has_action {
             println!(
                 "WARNING: '{}' has trailing spaces without transition action!",
                 &rule_match
