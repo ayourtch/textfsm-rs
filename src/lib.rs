@@ -20,7 +20,6 @@ pub struct TextFSMParser {
 pub struct TextFSM {
     pub parser: TextFSMParser,
     pub curr_state: String,
-    pub curr_rule: usize,
     pub curr_record: DataRecord,
     pub filldown_record: DataRecord,
     pub records: Vec<DataRecord>,
@@ -107,7 +106,6 @@ impl TextFSMParser {
     pub fn parse_state_rule_transition(pair: &Pair<'_, Rule>) -> RuleTransition {
         let mut record_action: RecordAction = Default::default();
         let mut line_action: LineAction = Default::default();
-        let mut maybe_next_state: Option<NextState> = None;
         // Self::print_pair(5, pair);
         for pair in pair.clone().into_inner() {
             match pair.as_rule() {
@@ -134,7 +132,8 @@ impl TextFSMParser {
                             maybe_err_msg = Some(p.as_str().to_string());
                         }
                     }
-                    maybe_next_state = Some(NextState::Error(maybe_err_msg));
+                    let next_state = NextState::Error(maybe_err_msg);
+                    line_action = LineAction::Next(Some(next_state));
                 }
                 Rule::next_state => {
                     if line_action == LineAction::Next(None) {
@@ -451,10 +450,130 @@ impl TextFSM {
         }
     }
 
+    pub fn set_curr_state(&mut self, state_name: &str) {
+        if state_name != "End" {
+            if self.parser.states.get(state_name).is_none() {
+                panic!("State '{}' not found!", state_name);
+            }
+        }
+        self.curr_state = state_name.to_string();
+    }
+
+    pub fn is_filldown_value(&self, value_name: &str) -> Option<bool> {
+        if let Some(ref val) = self.parser.values.get(value_name) {
+            if let Some(ref opts) = val.options {
+                if opts.contains("Filldown") {
+                    Some(true)
+                } else {
+                    Some(false)
+                }
+            } else {
+                Some(false)
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn parse_line(&mut self, aline: &str) -> Option<NextState> {
+        let maybe_next_state: Option<NextState> = None;
+
+        let curr_state = self.curr_state.clone();
+
+        if let Some(ref curr_state) = self.parser.states.get(&curr_state) {
+            for rule in &curr_state.rules {
+                let mut transition: RuleTransition = Default::default();
+                transition.line_action = LineAction::Continue;
+                // XXX
+                match &rule.maybe_regex {
+                    Some(MultiRegex::Classic(rx)) => {
+                        if let Some(caps) = rx.captures(aline) {
+                            for var in &rule.match_variables {
+                                if let Some(value) = caps.name(var) {
+                                    // println!("SET VAR '{}' = '{}'", &var, &value.as_str());
+                                    self.curr_record
+                                        .insert(var.clone(), value.as_str().to_string());
+                                } else {
+                                    panic!("Could not capture '{}' from string '{}'", var, aline);
+                                }
+                            }
+                            transition = rule.transition.clone();
+                        }
+                    }
+                    Some(MultiRegex::Fancy(rx)) => if let Ok(caps) = rx.captures(aline) {},
+                    x => {
+                        panic!("Regex {:?} on rule is not supported", &x);
+                    }
+                }
+
+                // println!("TRANS: {:?}", &transition);
+                match transition.record_action {
+                    RecordAction::Record => {
+                        let mut mandatory_count = 0;
+                        for k in &self.parser.mandatory_values {
+                            if self.curr_record.get(k).is_some() {
+                                mandatory_count += 1;
+                            }
+                        }
+                        if mandatory_count == self.parser.mandatory_values.len() {
+                            let mut new_rec = Default::default();
+                            std::mem::swap(&mut new_rec, &mut self.curr_record);
+                            self.records.push(new_rec);
+                        } else {
+                            // println!("RECORD: no required fields set");
+                        }
+                    }
+                    RecordAction::NoRecord => {}
+                    RecordAction::Clear => {
+                        let mut rem_keys: Vec<String> = vec![];
+                        for (ref k, ref v) in self.curr_record.iter() {
+                            if !self.is_filldown_value(&k).expect("Variable does not exist") {
+                                rem_keys.push(k.to_string());
+                            }
+                        }
+                        for k in rem_keys {
+                            self.curr_record.remove(&k);
+                        }
+                    }
+                    RecordAction::Clearall => {
+                        // reset the current record
+                        self.curr_record = Default::default();
+                    }
+                }
+                match transition.line_action {
+                    LineAction::Next(x) => return x,
+                    LineAction::Continue => {}
+                }
+            }
+        } else {
+            panic!("State {} not found!", &self.curr_state);
+        }
+        maybe_next_state
+    }
+
     pub fn parse_file(&mut self, fname: &str) -> Vec<DataRecord> {
         let input = std::fs::read_to_string(&fname).expect("Data file read failed");
         for aline in input.lines() {
-            println!("LINE: {}", &aline);
+            // println!("LINE: {}", &aline);
+            if let Some(next_state) = self.parse_line(&aline) {
+                match next_state {
+                    NextState::Error(maybe_msg) => {
+                        panic!("Error state reached! msg: {:?}", &maybe_msg);
+                    }
+                    NextState::NamedState(name) => {
+                        self.set_curr_state(&name);
+                    }
+                }
+            }
+            if &self.curr_state == "EOF" || &self.curr_state == "End" {
+                break;
+            }
+        }
+        if &self.curr_state != "End" {
+            self.set_curr_state("EOF");
+            self.parse_line("");
+            // FIXME: Can EOF state transition into something else ? Presumably not.
+            self.set_curr_state("End");
         }
         self.records.clone()
     }
