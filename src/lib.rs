@@ -79,8 +79,8 @@ pub enum MultiRegex {
 
 #[derive(Debug, Clone)]
 pub struct StateRuleCompiled {
-    rule_match: String,
-    expanded_rule_match: String,
+    _rule_match: String,
+    _expanded_rule_match: String,
     match_variables: Vec<String>,
     maybe_regex: Option<MultiRegex>,
     transition: RuleTransition,
@@ -93,6 +93,7 @@ pub struct StateCompiled {
 }
 
 impl TextFSMParser {
+    /*
     fn print_pair(indent: usize, pair: &Pair<'_, Rule>) {
         // println!("Debug: {:#?}", &pair);
         let spaces = " ".repeat(indent);
@@ -103,6 +104,7 @@ impl TextFSMParser {
             Self::print_pair(indent + 2, &p);
         }
     }
+    */
     pub fn parse_state_rule_transition(pair: &Pair<'_, Rule>) -> RuleTransition {
         let mut record_action: RecordAction = Default::default();
         let mut line_action: LineAction = Default::default();
@@ -221,7 +223,7 @@ impl TextFSMParser {
 
         let regex_val = match Regex::new(&expanded_rule_match) {
             Ok(r) => MultiRegex::Classic(r),
-            Err(e) => {
+            Err(_e) => {
                 use fancy_regex::Error;
                 use fancy_regex::ParseError;
 
@@ -260,10 +262,12 @@ impl TextFSMParser {
         };
         let maybe_regex = Some(regex_val);
         let transition = rule.transition.clone();
+        let _rule_match = rule_match;
+        let _expanded_rule_match = expanded_rule_match;
 
         Ok(StateRuleCompiled {
-            rule_match,
-            expanded_rule_match,
+            _rule_match,
+            _expanded_rule_match,
             match_variables,
             maybe_regex,
             transition,
@@ -303,6 +307,7 @@ impl TextFSMParser {
         let name = name.expect("internal error - state must have a name");
         Ok(StateCompiled { name, rules })
     }
+    /*
     pub fn parse_state_defs(pair: &Pair<'_, Rule>, values: &HashMap<String, ValueDefinition>) {
         // println!("=== STATE DEFINITIONS ===");
         for pair in pair.clone().into_inner() {
@@ -317,6 +322,7 @@ impl TextFSMParser {
             }
         }
     }
+    */
     pub fn parse_value_definition(pair: &Pair<'_, Rule>) -> Result<ValueDefinition, String> {
         // println!("value definition");
         let mut name: Option<String> = None;
@@ -359,7 +365,9 @@ impl TextFSMParser {
             if Rule::value_definition == pair.as_rule() {
                 let val = Self::parse_value_definition(&pair)?;
                 if let Some(ref opts) = val.options {
-                    mandatory_values.push(val.name.clone());
+                    if opts.contains("Required") {
+                        mandatory_values.push(val.name.clone());
+                    }
                 }
                 vals.insert(val.name.clone(), val);
             }
@@ -425,6 +433,10 @@ impl TextFSMParser {
                         }
                     }
                     // Self::process_pair(0, &pair);
+                }
+
+                if !seen_eoi {
+                    println!("WARNING: EOI token not seen");
                 }
 
                 // FIXME: check that the "Start" state exists
@@ -494,13 +506,32 @@ impl TextFSM {
                                     self.curr_record
                                         .insert(var.clone(), value.as_str().to_string());
                                 } else {
-                                    panic!("Could not capture '{}' from string '{}'", var, aline);
+                                    panic!(
+                                        "Classic Could not capture '{}' from string '{}'",
+                                        var, aline
+                                    );
                                 }
                             }
                             transition = rule.transition.clone();
                         }
                     }
-                    Some(MultiRegex::Fancy(rx)) => if let Ok(caps) = rx.captures(aline) {},
+                    Some(MultiRegex::Fancy(rx)) => {
+                        if let Ok(Some(caps)) = rx.captures(aline) {
+                            for var in &rule.match_variables {
+                                if let Some(value) = caps.name(var) {
+                                    // println!("SET VAR '{}' = '{}'", &var, &value.as_str());
+                                    self.curr_record
+                                        .insert(var.clone(), value.as_str().to_string());
+                                } else {
+                                    panic!(
+                                        "Classic Could not capture '{}' from string '{}'",
+                                        var, aline
+                                    );
+                                }
+                            }
+                            transition = rule.transition.clone();
+                        }
+                    }
                     x => {
                         panic!("Regex {:?} on rule is not supported", &x);
                     }
@@ -526,7 +557,7 @@ impl TextFSM {
                     RecordAction::NoRecord => {}
                     RecordAction::Clear => {
                         let mut rem_keys: Vec<String> = vec![];
-                        for (ref k, ref v) in self.curr_record.iter() {
+                        for (ref k, ref _v) in self.curr_record.iter() {
                             if !self.is_filldown_value(&k).expect("Variable does not exist") {
                                 rem_keys.push(k.to_string());
                             }
