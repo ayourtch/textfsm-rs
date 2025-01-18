@@ -368,7 +368,19 @@ impl TextFSMParser {
                             values = Self::parse_value_defs(&pair).unwrap();
                         }
                         Rule::state_definitions => {
-                            Self::parse_state_defs(&pair, &values);
+                            for pair in pair.clone().into_inner() {
+                                match pair.as_rule() {
+                                    Rule::state_definition => {
+                                        let state =
+                                            Self::parse_and_compile_state_definition(&pair, &values)
+                                                .unwrap();
+                                        states.insert(state.name.clone(), state);
+                                    }
+                                    x => {
+                                        panic!("state definition rule {:?} not supported", x);
+                                    }
+                                }
+                            }
                         }
                         Rule::EOI => {
                             seen_eoi = true;
