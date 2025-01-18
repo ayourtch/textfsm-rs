@@ -450,4 +450,12 @@ impl TextFSM {
             ..Default::default()
         }
     }
+
+    pub fn parse_file(&mut self, fname: &str) -> Vec<DataRecord> {
+        let input = std::fs::read_to_string(&fname).expect("Data file read failed");
+        for aline in input.lines() {
+            println!("LINE: {}", &aline);
+        }
+        self.records.clone()
+    }
 }
