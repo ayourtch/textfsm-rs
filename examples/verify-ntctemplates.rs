@@ -7,7 +7,13 @@ struct ParsedSample {
     parsed_sample: Vec<HashMap<String, String>>,
 }
 
-fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) {
+enum VerifyResult {
+    CouldNotLoadYaml,
+    VerifySuccess,
+    ResultsDiffer,
+}
+
+fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) -> VerifyResult {
     let mut textfsm = TextFSM::from_file(&template_name);
     let yaml = std::fs::read_to_string(&yaml_verify_name).expect("YAML File read failed");
 
@@ -16,6 +22,7 @@ fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) {
     if let Ok(yaml_map) = serde_yaml::from_str::<ParsedSample>(&yaml) {
         if result == yaml_map.parsed_sample {
             println!("Parsed result matches YAML");
+            VerifyResult::VerifySuccess
         } else {
             println!("Results differ");
             println!("Records: {:?}", &result);
@@ -51,9 +58,11 @@ fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) {
             println!("Only in yaml: {:?}", &only_in_yaml);
             println!("Only in parse: {:?}", &only_in_parse);
             println!("\n\n");
+            VerifyResult::ResultsDiffer
         }
     } else {
         println!("WARNING: YAML did not load correctly!");
+        VerifyResult::CouldNotLoadYaml
     }
 }
 
@@ -120,6 +129,11 @@ fn main() {
 
     let mut all_tests: Vec<TestRecord> = vec![];
 
+    let mut verify_count = 0;
+    let mut result_no_yaml_count = 0;
+    let mut result_success_count = 0;
+    let mut result_differ_count = 0;
+
     for test_family in &test_family_names {
         let test_family_dir = format!("{}/tests/{}/", &root_path, test_family);
         let test_set_names = collect_bare_directories(&test_family_dir).expect(&format!(
@@ -148,7 +162,18 @@ fn main() {
                     );
                     if std::path::Path::new(&yaml_file).exists() {
                         println!("VERIFY: {} {} {}", &template_file, &data_file, &yaml_file);
-                        verify(&template_file, &data_file, &yaml_file);
+                        verify_count += 1;
+                        match verify(&template_file, &data_file, &yaml_file) {
+                            VerifyResult::CouldNotLoadYaml => {
+                                result_no_yaml_count += 1;
+                            }
+                            VerifyResult::VerifySuccess => {
+                                result_success_count += 1;
+                            }
+                            VerifyResult::ResultsDiffer => {
+                                result_differ_count += 1;
+                            }
+                        }
                     } else {
                         println!("WARNING: raw file exists {} but no yaml", &data_file);
                     }
@@ -161,4 +186,10 @@ fn main() {
             }
         }
     }
+
+    println!("\nNTC-TEMPLATES VERIFY RESULTS:");
+    println!("   Total tests run: {}", verify_count);
+    println!("      Could not load YAML: {}", result_no_yaml_count);
+    println!("      Verify success: {}", result_success_count);
+    println!("      Results differ: {}", result_differ_count);
 }
