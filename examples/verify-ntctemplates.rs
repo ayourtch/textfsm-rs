@@ -55,10 +55,23 @@ fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) -> Verif
                 only_in_yaml.push(vo);
             }
 
+            let mut mismatch_count = 0;
+            for x in &only_in_yaml {
+                mismatch_count += x.len();
+            }
+            for x in &only_in_parse {
+                mismatch_count += x.len();
+            }
             println!("Only in yaml: {:?}", &only_in_yaml);
             println!("Only in parse: {:?}", &only_in_parse);
             println!("\n\n");
-            VerifyResult::ResultsDiffer
+            if mismatch_count == 0 {
+                println!("Results differ, but only by order");
+                VerifyResult::VerifySuccess
+            } else {
+                println!("Results differ");
+                VerifyResult::ResultsDiffer
+            }
         }
     } else {
         println!("WARNING: YAML did not load correctly!");
