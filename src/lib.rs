@@ -552,7 +552,7 @@ impl TextFSM {
                             std::mem::swap(&mut new_rec, &mut self.curr_record);
                             // Set the values that aren't set yet - FIXME: this feature should be
                             // possible to be disabled as "" and nothing are very different things.
-                            for (k, v) in &self.parser.values {
+                            for (_k, v) in &self.parser.values {
                                 if new_rec.get(&v.name).is_none() {
                                     new_rec.insert(v.name.clone(), format!(""));
                                 }
