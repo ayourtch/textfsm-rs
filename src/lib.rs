@@ -197,6 +197,10 @@ impl TextFSMParser {
             );
             rule_match = rule_match.trim_end().to_string();
         }
+        if rule_match.contains("\\<") {
+            println!("WARNING: replacing \\< with < in '{}'", &rule_match);
+            rule_match = rule_match.replace("\\<", "<");
+        }
         StateRule {
             rule_match,
             transition,
