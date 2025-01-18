@@ -169,6 +169,7 @@ impl TextFSMParser {
         // Self::print_pair(10, pair);
         // println!("--------");
         let mut transition: RuleTransition = Default::default();
+        let mut has_action = false;
         let spaces = "";
         for pair in pair.clone().into_inner() {
             match pair.as_rule() {
@@ -176,6 +177,7 @@ impl TextFSMParser {
                     rule_match = Some(pair.as_str().to_string());
                 }
                 Rule::transition_action => {
+                    has_action = true;
                     transition = Self::parse_state_rule_transition(&pair);
                     // println!("TRANSITION: {:?}", &transition);
                 }
@@ -187,7 +189,14 @@ impl TextFSMParser {
                 }
             }
         }
-        let rule_match = rule_match.expect("rule_match must be always set");
+        let mut rule_match = rule_match.expect("rule_match must be always set");
+        if rule_match.ends_with(" ") && !has_action {
+            println!(
+                "WARNING: '{}' has trailing spaces without transition action!",
+                &rule_match
+            );
+            rule_match = rule_match.trim_end().to_string();
+        }
         StateRule {
             rule_match,
             transition,

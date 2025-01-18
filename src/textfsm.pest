@@ -29,7 +29,6 @@ state_name = @{ ( !"." ~ (ASCII_ALPHANUMERIC | "_"))+ }
 rules = { rule ~ (NEWLINE+ ~ rule)* ~ NEWLINE* }
 rule = ${ indentation? ~ rule_match ~ rule_transition? }
 indentation = _{ " "+ }
-// rule_match = @{ "^" ~ (!" ->" ~ ANY)* }
 rule_match = { "^" ~ (!(" -> " | NEWLINE) ~ ANY)* }
 rule_transition = _{ " -> " ~ WHITESPACE* ~ transition_action }
 
