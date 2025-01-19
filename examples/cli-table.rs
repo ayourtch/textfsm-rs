@@ -108,12 +108,12 @@ fn main() {
 
     let template_dir = format!("{}/ntc_templates/templates/", &root_path);
     let cli_table = CliTable::from_file(&format!("{}/index", &template_dir));
-    // println!("CLI table: {:?}", &cli_table);
+
     if let Some((index_name, row)) = cli_table.get_template_for_command("cisco_ios", "show int") {
         println!("index: {:?}", index_name);
         println!("Row: {:?}", &row);
     }
-    /*
+
     let tests_dir = format!("{}/tests/", &root_path);
     let template_names = collect_file_names(&template_dir, "textfsm")
         .expect("Could not scan the template directory");
@@ -140,6 +140,8 @@ fn main() {
             &test_family_dir
         ));
         for test_set in &test_set_names {
+            let cli_cmd = test_set.replace_all("_", " ");
+
             let candidate_template_name = format!("{}_{}", test_family, test_set);
             if template_names_set.contains(&candidate_template_name) {
                 let test_dir = format!("{}/tests/{}/{}/", &root_path, test_family, test_set);
