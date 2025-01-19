@@ -41,6 +41,7 @@ impl Default for DataRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
 pub enum Value {
     Single(String),
     List(Vec<String>),

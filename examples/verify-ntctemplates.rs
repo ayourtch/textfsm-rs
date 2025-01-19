@@ -35,10 +35,13 @@ fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) -> Verif
 
             for (i, irec) in result.iter().enumerate() {
                 let mut vo: Vec<String> = vec![];
-                for (k, _v) in &irec.0 {
-                    if i >= yaml_map.parsed_sample.len()
-                        || yaml_map.parsed_sample[i].get(k).is_none()
-                    {
+                for (k, v) in &irec.0 {
+                    if i < yaml_map.parsed_sample.len() {
+                        let v0 = yaml_map.parsed_sample[i].get(k);
+                        if v0.is_none() || v0.unwrap() != v {
+                            vo.push(k.clone());
+                        }
+                    } else {
                         vo.push(k.clone());
                     }
                 }
@@ -47,8 +50,13 @@ fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) -> Verif
 
             for (i, irec) in yaml_map.parsed_sample.iter().enumerate() {
                 let mut vo: Vec<String> = vec![];
-                for (k, _v) in &irec.0 {
-                    if i >= result.len() || result[i].get(k).is_none() {
+                for (k, v) in &irec.0 {
+                    if i < result.len() {
+                        let v0 = result[i].get(k);
+                        if v0.is_none() || v0.unwrap() != v {
+                            vo.push(k.clone());
+                        }
+                    } else {
                         vo.push(k.clone());
                     }
                 }
@@ -75,6 +83,7 @@ fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) -> Verif
         }
     } else {
         println!("WARNING: YAML did not load correctly!");
+        panic!("Could not load YAML");
         VerifyResult::CouldNotLoadYaml
     }
 }
