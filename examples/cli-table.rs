@@ -35,7 +35,13 @@ fn verify(
                 result = new_result;
             } else {
                 for (i, nrow) in new_result.into_iter().enumerate() {
-                    result[i].overwrite_from(nrow);
+                    for res in result.iter_mut() {
+                        if &res.record_key != &nrow.record_key {
+                            continue;
+                        }
+                        res.overwrite_from(nrow);
+                        break;
+                    }
                 }
             }
         }

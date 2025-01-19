@@ -11,7 +11,12 @@ pub mod varsubst;
 pub use cli_table::CliTable;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DataRecord(pub HashMap<String, Value>);
+pub struct DataRecord {
+    #[serde(flatten)]
+    pub fields: HashMap<String, Value>,
+    #[serde(skip_deserializing)]
+    pub record_key: Option<String>,
+}
 
 impl DataRecord {
     pub fn new() -> Self {
@@ -19,8 +24,8 @@ impl DataRecord {
     }
 
     pub fn overwrite_from(&mut self, from: DataRecord) {
-        for (k, v) in from.0 {
-            self.0.insert(k, v);
+        for (k, v) in from.fields {
+            self.fields.insert(k, v);
         }
     }
     pub fn compare_sets(
@@ -32,7 +37,7 @@ impl DataRecord {
 
         for (i, irec) in result.iter().enumerate() {
             let mut vo: Vec<String> = vec![];
-            for (k, v) in &irec.0 {
+            for (k, v) in &irec.fields {
                 if i < other.len() {
                     let v0 = other[i].get(k);
                     if v0.is_none() || v0.unwrap() != v {
@@ -47,7 +52,7 @@ impl DataRecord {
 
         for (i, irec) in other.iter().enumerate() {
             let mut vo: Vec<String> = vec![];
-            for (k, v) in &irec.0 {
+            for (k, v) in &irec.fields {
                 if i < result.len() {
                     let v0 = result[i].get(k);
                     if v0.is_none() || v0.unwrap() != v {
@@ -63,29 +68,29 @@ impl DataRecord {
     }
 
     pub fn insert(&mut self, name: String, value: String) {
-        if self.0.contains_key(&name) {
-            let mut existing = self.0.remove(&name);
+        if self.fields.contains_key(&name) {
+            let mut existing = self.fields.remove(&name);
             match existing {
                 None => {
                     panic!("internal error");
                 }
                 Some(Value::Single(oldval)) => {
                     let newval = Value::List(vec![oldval, value]);
-                    self.0.insert(name, newval);
+                    self.fields.insert(name, newval);
                 }
                 Some(Value::List(ref mut oldlist)) => {
                     oldlist.push(value);
-                    self.0.insert(name, existing.unwrap());
+                    self.fields.insert(name, existing.unwrap());
                 }
             }
         } else {
-            self.0.insert(name, Value::Single(value));
+            self.fields.insert(name, Value::Single(value));
         }
     }
 
     pub fn append_value(&mut self, name: String, value: Value) {
-        if self.0.contains_key(&name) {
-            let mut existing = self.0.remove(&name);
+        if self.fields.contains_key(&name) {
+            let mut existing = self.fields.remove(&name);
             match existing {
                 None => {
                     panic!("internal error");
@@ -93,7 +98,7 @@ impl DataRecord {
                 Some(Value::Single(oldval)) => match value {
                     Value::Single(val) => {
                         let newval = Value::Single(val);
-                        self.0.insert(name, newval);
+                        self.fields.insert(name, newval);
                     }
                     Value::List(lst) => {
                         panic!(
@@ -105,37 +110,40 @@ impl DataRecord {
                 Some(Value::List(ref mut oldlist)) => match value {
                     Value::Single(val) => {
                         oldlist.push(val);
-                        self.0.insert(name, existing.unwrap());
+                        self.fields.insert(name, existing.unwrap());
                     }
                     Value::List(mut lst) => {
                         oldlist.append(&mut lst);
-                        self.0.insert(name, existing.unwrap());
+                        self.fields.insert(name, existing.unwrap());
                     }
                 },
             }
         } else {
-            self.0.insert(name, value);
+            self.fields.insert(name, value);
         }
     }
 
     pub fn remove(&mut self, key: &str) {
-        self.0.remove(key);
+        self.fields.remove(key);
     }
     pub fn keys(&self) -> std::collections::hash_map::Keys<'_, String, Value> {
-        self.0.keys()
+        self.fields.keys()
     }
 
     pub fn get(&self, key: &str) -> Option<&Value> {
-        self.0.get(key)
+        self.fields.get(key)
     }
 
     pub fn iter(&self) -> std::collections::hash_map::Iter<'_, String, Value> {
-        self.0.iter()
+        self.fields.iter()
     }
 }
 impl Default for DataRecord {
     fn default() -> Self {
-        DataRecord(Default::default())
+        DataRecord {
+            fields: Default::default(),
+            record_key: None,
+        }
     }
 }
 
@@ -675,6 +683,14 @@ impl TextFSM {
         self.curr_state = state_name.to_string();
     }
 
+    pub fn is_key_value(&self, value_name: &str) -> Option<bool> {
+        if let Some(ref val) = self.parser.values.get(value_name) {
+            Some(val.is_key)
+        } else {
+            None
+        }
+    }
+
     pub fn is_filldown_value(&self, value_name: &str) -> Option<bool> {
         if let Some(ref val) = self.parser.values.get(value_name) {
             Some(val.is_filldown)
@@ -726,10 +742,20 @@ impl TextFSM {
                 Value::Single(format!(""))
             }
         };
-        curr_record.0.insert(name.to_string(), ins_value.clone());
+        curr_record
+            .fields
+            .insert(name.to_string(), ins_value.clone());
+        if self.is_key_value(name).unwrap() {
+            curr_record.record_key = if let Some(k) = curr_record.record_key.clone() {
+                Some(format!("{}/{:?}", &k, &ins_value))
+            } else {
+                Some(format!("{:?}", &ins_value))
+            };
+            trace!("RECORD KEY: '{:?}'", &curr_record.record_key);
+        }
         if self.is_filldown_value(name).unwrap() {
             filldown_record
-                .0
+                .fields
                 .insert(name.to_string(), ins_value.clone());
         }
     }
@@ -795,11 +821,11 @@ impl TextFSM {
                 if capture_matched {
                     trace!("TMP_REC: {:?}", &tmp_datarec);
                     trace!("TMP_FILLDOWN: {:?}", &tmp_filldown_rec);
-                    for (name, v) in tmp_datarec.0 {
+                    for (name, v) in tmp_datarec.fields {
                         if self.is_fillup_value(&name).unwrap() {
                             let name = &name;
                             for fillup_record in self.records.iter_mut().rev() {
-                                if let Some(ref oldval) = fillup_record.0.get(name) {
+                                if let Some(ref oldval) = fillup_record.fields.get(name) {
                                     match oldval {
                                         Value::Single(s) => {
                                             if s != "" {
@@ -811,11 +837,13 @@ impl TextFSM {
                                         }
                                     }
                                 }
-                                fillup_record.0.insert(name.to_string(), v.clone());
+                                fillup_record.fields.insert(name.to_string(), v.clone());
                             }
                         }
                         self.curr_record.append_value(name, v);
                     }
+                    trace!("TMP KEY: {:?}", &tmp_datarec.record_key);
+                    self.curr_record.record_key = tmp_datarec.record_key;
                     self.filldown_record.overwrite_from(tmp_filldown_rec);
                     transition = rule.transition.clone();
                 }
@@ -843,10 +871,12 @@ impl TextFSM {
                                 for (_k, v) in &self.parser.values {
                                     if new_rec.get(&v.name).is_none() {
                                         if self.is_list_value(&v.name).expect("is list?") {
-                                            new_rec.0.insert(v.name.clone(), Value::List(vec![]));
+                                            new_rec
+                                                .fields
+                                                .insert(v.name.clone(), Value::List(vec![]));
                                         } else {
                                             new_rec
-                                                .0
+                                                .fields
                                                 .insert(v.name.clone(), Value::Single(format!("")));
                                         }
                                     }
@@ -894,9 +924,10 @@ impl TextFSM {
 
         for irec in src {
             let mut hm = DataRecord::new();
+            hm.record_key = irec.record_key.clone();
             for (k, v) in irec.iter() {
                 let kl = k.to_lowercase();
-                hm.0.insert(kl, v.clone());
+                hm.fields.insert(kl, v.clone());
             }
             out.push(hm);
         }
