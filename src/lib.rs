@@ -681,6 +681,14 @@ impl TextFSM {
         }
     }
 
+    pub fn is_fillup_value(&self, value_name: &str) -> Option<bool> {
+        if let Some(ref val) = self.parser.values.get(value_name) {
+            Some(val.is_fillup)
+        } else {
+            None
+        }
+    }
+
     pub fn is_list_value(&self, value_name: &str) -> Option<bool> {
         if let Some(ref val) = self.parser.values.get(value_name) {
             Some(val.is_list)
@@ -785,8 +793,26 @@ impl TextFSM {
                 if capture_matched {
                     trace!("TMP_REC: {:?}", &tmp_datarec);
                     trace!("TMP_FILLDOWN: {:?}", &tmp_filldown_rec);
-                    for (k, v) in tmp_datarec.0 {
-                        self.curr_record.append_value(k, v);
+                    for (name, v) in tmp_datarec.0 {
+                        if self.is_fillup_value(&name).unwrap() {
+                            let name = &name;
+                            for fillup_record in self.records.iter_mut().rev() {
+                                if let Some(ref oldval) = fillup_record.0.get(name) {
+                                    match oldval {
+                                        Value::Single(s) => {
+                                            if s != "" {
+                                                break;
+                                            }
+                                        }
+                                        Value::List(lst) => {
+                                            panic!("fillup not supported for lists!");
+                                        }
+                                    }
+                                }
+                                fillup_record.0.insert(name.to_string(), v.clone());
+                            }
+                        }
+                        self.curr_record.append_value(name, v);
                     }
                     self.filldown_record.overwrite_from(tmp_filldown_rec);
                     transition = rule.transition.clone();
