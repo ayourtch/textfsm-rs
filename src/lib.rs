@@ -3,11 +3,48 @@ pub use pest::iterators::Pair;
 pub use pest::Parser;
 use pest_derive::Parser;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod varsubst;
 
-pub type DataRecord = HashMap<String, String>;
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DataRecord(pub HashMap<String, Value>);
+
+impl DataRecord {
+    pub fn new() -> Self {
+        Default::default()
+    }
+    pub fn insert(&mut self, name: String, value: String) {
+        self.0.insert(name, Value::Single(value));
+    }
+
+    pub fn remove(&mut self, key: &str) {
+        self.0.remove(key);
+    }
+    pub fn keys(&self) -> std::collections::hash_map::Keys<'_, String, Value> {
+        self.0.keys()
+    }
+
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        self.0.get(key)
+    }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, String, Value> {
+        self.0.iter()
+    }
+}
+impl Default for DataRecord {
+    fn default() -> Self {
+        DataRecord(Default::default())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum Value {
+    Single(String),
+    List(Vec<String>),
+}
 
 #[derive(Parser, Debug, Default, Clone)]
 #[grammar = "textfsm.pest"]
@@ -602,7 +639,7 @@ impl TextFSM {
                         }
                         if number_of_values > 0 {
                             if mandatory_count == self.parser.mandatory_values.len() {
-                                let mut new_rec: HashMap<String, String> = Default::default();
+                                let mut new_rec: DataRecord = Default::default();
                                 /* fill the record from filldown */
                                 new_rec = self.filldown_record.clone();
                                 /* swap with the current record */
@@ -657,9 +694,9 @@ impl TextFSM {
 
         for irec in src {
             let mut hm = DataRecord::new();
-            for (k, v) in irec {
+            for (k, v) in irec.iter() {
                 let kl = k.to_lowercase();
-                hm.insert(kl, v.clone());
+                hm.0.insert(kl, v.clone());
             }
             out.push(hm);
         }

@@ -35,7 +35,7 @@ fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) -> Verif
 
             for (i, irec) in result.iter().enumerate() {
                 let mut vo: Vec<String> = vec![];
-                for (k, _v) in irec {
+                for (k, _v) in &irec.0 {
                     if i >= yaml_map.parsed_sample.len()
                         || yaml_map.parsed_sample[i].get(k).is_none()
                     {
@@ -47,7 +47,7 @@ fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) -> Verif
 
             for (i, irec) in yaml_map.parsed_sample.iter().enumerate() {
                 let mut vo: Vec<String> = vec![];
-                for (k, _v) in irec {
+                for (k, _v) in &irec.0 {
                     if i >= result.len() || result[i].get(k).is_none() {
                         vo.push(k.clone());
                     }
