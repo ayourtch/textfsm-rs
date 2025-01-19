@@ -203,6 +203,11 @@ pub struct StateRule {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ValueDefinition {
     name: String,
+    is_filldown: bool,
+    is_key: bool,
+    is_required: bool,
+    is_list: bool,
+    is_fillup: bool,
     regex_pattern: String,
     options: Option<String>,
 }
@@ -485,6 +490,12 @@ impl TextFSMParser {
         let mut regex_pattern: Option<String> = None;
         let mut regex_val: Option<Regex> = None;
         let mut options: Option<String> = None;
+        let mut is_filldown = false;
+        let mut is_key = false;
+        let mut is_required = false;
+        let mut is_list = false;
+        let mut is_fillup = false;
+
         for p in pair.clone().into_inner() {
             match p.as_rule() {
                 Rule::options => options = Some(p.as_str().to_string()),
@@ -500,6 +511,19 @@ impl TextFSMParser {
             // Self::print_pair(indent + 2, &p);
         }
         if let (Some(name), Some(mut regex_pattern)) = (name.clone(), regex_pattern.clone()) {
+            if let Some(ref opts) = options {
+                let opts = opts.split(",");
+                for word in opts {
+                    match word {
+                        "Filldown" => is_filldown = true,
+                        "Key" => is_key = true,
+                        "Required" => is_required = true,
+                        "List" => is_list = true,
+                        "Fillup" => is_fillup = true,
+                        x => panic!("Unknown option {:?}", &x),
+                    }
+                }
+            }
             if regex_pattern.contains(r#"\<"#) {
                 println!("WARNING: replacing \\< with < in value '{}'", &name);
                 regex_pattern = regex_pattern.replace("\\<", "<");
@@ -511,6 +535,11 @@ impl TextFSMParser {
             Ok(ValueDefinition {
                 name,
                 regex_pattern,
+                is_filldown,
+                is_key,
+                is_required,
+                is_list,
+                is_fillup,
                 options,
             })
         } else {
@@ -528,10 +557,8 @@ impl TextFSMParser {
         for pair in pair.clone().into_inner() {
             if Rule::value_definition == pair.as_rule() {
                 let val = Self::parse_value_definition(&pair)?;
-                if let Some(ref opts) = val.options {
-                    if opts.contains("Required") {
-                        mandatory_values.push(val.name.clone());
-                    }
+                if val.is_required {
+                    mandatory_values.push(val.name.clone());
                 }
                 vals.insert(val.name.clone(), val);
             }
@@ -648,15 +675,7 @@ impl TextFSM {
 
     pub fn is_filldown_value(&self, value_name: &str) -> Option<bool> {
         if let Some(ref val) = self.parser.values.get(value_name) {
-            if let Some(ref opts) = val.options {
-                if opts.contains("Filldown") {
-                    Some(true)
-                } else {
-                    Some(false)
-                }
-            } else {
-                Some(false)
-            }
+            Some(val.is_filldown)
         } else {
             None
         }
@@ -664,15 +683,7 @@ impl TextFSM {
 
     pub fn is_list_value(&self, value_name: &str) -> Option<bool> {
         if let Some(ref val) = self.parser.values.get(value_name) {
-            if let Some(ref opts) = val.options {
-                if opts.contains("List") {
-                    Some(true)
-                } else {
-                    Some(false)
-                }
-            } else {
-                Some(false)
-            }
+            Some(val.is_list)
         } else {
             None
         }
