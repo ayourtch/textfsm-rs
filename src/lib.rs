@@ -16,6 +16,11 @@ impl DataRecord {
         Default::default()
     }
 
+    pub fn overwrite_from(&mut self, from: DataRecord) {
+        for (k, v) in from.0 {
+            self.0.insert(k, v);
+        }
+    }
     pub fn compare_sets(
         result: &Vec<Self>,
         other: &Vec<Self>,
@@ -73,6 +78,41 @@ impl DataRecord {
             }
         } else {
             self.0.insert(name, Value::Single(value));
+        }
+    }
+
+    pub fn append_value(&mut self, name: String, value: Value) {
+        if self.0.contains_key(&name) {
+            let mut existing = self.0.remove(&name);
+            match existing {
+                None => {
+                    panic!("internal error");
+                }
+                Some(Value::Single(oldval)) => match value {
+                    Value::Single(val) => {
+                        let newval = Value::Single(val);
+                        self.0.insert(name, newval);
+                    }
+                    Value::List(lst) => {
+                        panic!(
+                            "can not append list {:?} to single {:?} in var {}",
+                            &lst, &oldval, &name
+                        );
+                    }
+                },
+                Some(Value::List(ref mut oldlist)) => match value {
+                    Value::Single(val) => {
+                        oldlist.push(val);
+                        self.0.insert(name, existing.unwrap());
+                    }
+                    Value::List(mut lst) => {
+                        oldlist.append(&mut lst);
+                        self.0.insert(name, existing.unwrap());
+                    }
+                },
+            }
+        } else {
+            self.0.insert(name, value);
         }
     }
 
@@ -622,6 +662,57 @@ impl TextFSM {
         }
     }
 
+    pub fn is_list_value(&self, value_name: &str) -> Option<bool> {
+        if let Some(ref val) = self.parser.values.get(value_name) {
+            if let Some(ref opts) = val.options {
+                if opts.contains("List") {
+                    Some(true)
+                } else {
+                    Some(false)
+                }
+            } else {
+                Some(false)
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn insert_value(
+        &self,
+        typ: &str,
+        curr_record: &mut DataRecord,
+        filldown_record: &mut DataRecord,
+        name: &str,
+        maybe_value: Option<String>,
+        aline: &str,
+    ) {
+        let ins_value = if let Some(value) = maybe_value {
+            trace!("{} SET VAR '{}' = '{}'", &typ, &name, &value.as_str());
+            if self.is_list_value(name).expect("is list?") {
+                Value::List(vec![value.clone()])
+            } else {
+                Value::Single(value.clone())
+            }
+        } else {
+            error!(
+                "WARNING: {} Could not capture '{}' from string '{}'",
+                typ, name, aline
+            );
+            if self.is_list_value(name).expect("is list?") {
+                Value::List(vec![format!("None")])
+            } else {
+                Value::Single(format!(""))
+            }
+        };
+        curr_record.0.insert(name.to_string(), ins_value.clone());
+        if self.is_filldown_value(name).unwrap() {
+            filldown_record
+                .0
+                .insert(name.to_string(), ins_value.clone());
+        }
+    }
+
     pub fn parse_line(&mut self, aline: &str) -> Option<NextState> {
         let maybe_next_state: Option<NextState> = None;
 
@@ -633,55 +724,61 @@ impl TextFSM {
                 let mut transition: RuleTransition = Default::default();
                 transition.line_action = LineAction::Continue;
                 trace!("TRY RULE: {:?}", &rule);
+                let mut capture_matched = false;
+                let mut tmp_datarec = DataRecord::new();
+                let mut tmp_filldown_rec = DataRecord::new();
                 match &rule.maybe_regex {
                     Some(MultiRegex::Classic(rx)) => {
-                        if let Some(caps) = rx.captures(aline) {
-                            debug!("RULE(CLASSIC REGEX): {:?}", &rule);
-                            for var in &rule.match_variables {
-                                if let Some(value) = caps.name(var) {
-                                    // println!("CLASSIC SET VAR '{}' = '{}'", &var, &value.as_str());
-                                    self.curr_record
-                                        .insert(var.clone(), value.as_str().to_string());
-                                    if self.is_filldown_value(&var).unwrap() {
-                                        self.filldown_record
-                                            .insert(var.clone(), value.as_str().to_string());
-                                    }
-                                } else {
-                                    println!(
-                                        "WARNING: Classic Could not capture '{}' from string '{}'",
-                                        var, aline
-                                    );
-                                    self.curr_record.insert(var.clone(), format!(""));
-                                    if self.is_filldown_value(&var).unwrap() {
-                                        self.filldown_record.insert(var.clone(), format!(""));
-                                    }
-                                }
+                        debug!("RULE(CLASSIC REGEX): {:?}", &rule);
+                        for caps in rx.captures_iter(aline) {
+                            for name in &rule.match_variables {
+                                let maybe_value = caps.name(name).map(|x| x.as_str().to_string());
+                                self.insert_value(
+                                    "CLASSIC",
+                                    &mut tmp_datarec,
+                                    &mut tmp_filldown_rec,
+                                    name,
+                                    maybe_value,
+                                    aline,
+                                );
                             }
-                            transition = rule.transition.clone();
+                            capture_matched = true;
                         }
                     }
                     Some(MultiRegex::Fancy(rx)) => {
-                        if let Ok(Some(caps)) = rx.captures(aline) {
-                            // println!("RULE(FANCY REGEX): {:?}", &rule);
-                            for var in &rule.match_variables {
-                                if let Some(value) = caps.name(var) {
-                                    // println!("FANCY SET VAR '{}' = '{}'", &var, &value.as_str());
-                                    self.curr_record
-                                        .insert(var.clone(), value.as_str().to_string());
-                                } else {
-                                    println!(
-                                        "WARNING: Fancy Could not capture '{}' from string '{}'",
-                                        var, aline
+                        debug!("RULE(FANCY REGEX): {:?}", &rule);
+                        for caps in rx.captures_iter(aline) {
+                            for name in &rule.match_variables {
+                                if let Ok(ref caps) = caps {
+                                    let maybe_value =
+                                        caps.name(name).map(|x| x.as_str().to_string());
+                                    self.insert_value(
+                                        "FANCY",
+                                        &mut tmp_datarec,
+                                        &mut tmp_filldown_rec,
+                                        name,
+                                        maybe_value,
+                                        aline,
                                     );
-                                    self.curr_record.insert(var.clone(), format!(""));
+                                } else {
+                                    panic!("FANCY caps not ok");
                                 }
                             }
-                            transition = rule.transition.clone();
+                            capture_matched = true;
                         }
                     }
                     x => {
                         panic!("Regex {:?} on rule is not supported", &x);
                     }
+                }
+                if capture_matched {
+                    trace!("TMP_REC: {:?}", &tmp_datarec);
+                    trace!("TMP_FILLDOWN: {:?}", &tmp_filldown_rec);
+                    for (k, v) in tmp_datarec.0 {
+                        self.curr_record.append_value(k, v);
+                    }
+                    self.filldown_record.overwrite_from(tmp_filldown_rec);
+                    transition = rule.transition.clone();
                 }
                 // println!("TRANS: {:?}", &transition);
 
@@ -706,7 +803,13 @@ impl TextFSM {
                                 // possible to be disabled as "" and nothing are very different things.
                                 for (_k, v) in &self.parser.values {
                                     if new_rec.get(&v.name).is_none() {
-                                        new_rec.insert(v.name.clone(), format!(""));
+                                        if self.is_list_value(&v.name).expect("is list?") {
+                                            new_rec.0.insert(v.name.clone(), Value::List(vec![]));
+                                        } else {
+                                            new_rec
+                                                .0
+                                                .insert(v.name.clone(), Value::Single(format!("")));
+                                        }
                                     }
                                 }
                                 trace!("RECORD: {:?}", &new_rec);
