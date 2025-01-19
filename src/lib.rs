@@ -547,12 +547,19 @@ impl TextFSM {
                                     // println!("CLASSIC SET VAR '{}' = '{}'", &var, &value.as_str());
                                     self.curr_record
                                         .insert(var.clone(), value.as_str().to_string());
+                                    if self.is_filldown_value(&var).unwrap() {
+                                        self.filldown_record
+                                            .insert(var.clone(), value.as_str().to_string());
+                                    }
                                 } else {
                                     println!(
                                         "WARNING: Classic Could not capture '{}' from string '{}'",
                                         var, aline
                                     );
                                     self.curr_record.insert(var.clone(), format!(""));
+                                    if self.is_filldown_value(&var).unwrap() {
+                                        self.filldown_record.insert(var.clone(), format!(""));
+                                    }
                                 }
                             }
                             transition = rule.transition.clone();
@@ -596,6 +603,9 @@ impl TextFSM {
                         if number_of_values > 0 {
                             if mandatory_count == self.parser.mandatory_values.len() {
                                 let mut new_rec: HashMap<String, String> = Default::default();
+                                /* fill the record from filldown */
+                                new_rec = self.filldown_record.clone();
+                                /* swap with the current record */
                                 std::mem::swap(&mut new_rec, &mut self.curr_record);
                                 // Set the values that aren't set yet - FIXME: this feature should be
                                 // possible to be disabled as "" and nothing are very different things.
@@ -628,6 +638,7 @@ impl TextFSM {
                     RecordAction::Clearall => {
                         // reset the current record
                         self.curr_record = Default::default();
+                        self.filldown_record = Default::default();
                     }
                 }
                 match transition.line_action {
