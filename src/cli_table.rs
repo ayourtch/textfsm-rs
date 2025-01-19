@@ -24,10 +24,10 @@ pub struct CliTableRegexRule {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CliTableRow {
-    templates: Vec<String>,
-    hostname: Option<String>,
-    platform: Option<String>,
-    command: String,
+    pub templates: Vec<String>,
+    pub hostname: Option<String>,
+    pub platform: Option<String>,
+    pub command: String,
 }
 
 impl ParsedCliTable {
@@ -155,10 +155,8 @@ impl CliTable {
         platform: &str,
         cmd: &str,
     ) -> Option<(String, CliTableRow)> {
-        let plat_regex_list = self
-            .platform_regex_rules
-            .get(platform)
-            .expect("Could not find platform");
+        let plat_regex_list = self.platform_regex_rules.get(platform)?;
+        // .expect(&format!("Could not find platform {}", &platform));
         for rule in plat_regex_list {
             if rule.command_regex.is_match(cmd).expect("Fancy regex ok?") {
                 let row = self.tables[rule.table_index].rows[rule.row_index].clone();

@@ -13,13 +13,35 @@ enum VerifyResult {
     ResultsDiffer,
 }
 
-fn verify(template_name: &str, data_name: &str, yaml_verify_name: &str) -> VerifyResult {
-    let mut textfsm = TextFSM::from_file(&template_name);
+fn verify(
+    template_dir: &str,
+    row: &cli_table::CliTableRow,
+    data_name: &str,
+    yaml_verify_name: &str,
+) -> VerifyResult {
     let yaml = std::fs::read_to_string(&yaml_verify_name).expect("YAML File read failed");
 
-    let result = textfsm.parse_file(&data_name, Some(DataRecordConversion::LowercaseKeys));
-    println!("RESULT: {:?}\n", &result);
     if let Ok(yaml_map) = serde_yaml::from_str::<ParsedSample>(&yaml) {
+        let mut result: Vec<DataRecord> = vec![];
+
+        for short_template_name in &row.templates {
+            let template_name = format!("{}/{}", template_dir, short_template_name);
+            let mut textfsm = TextFSM::from_file(&template_name);
+            let new_result =
+                textfsm.parse_file(&data_name, Some(DataRecordConversion::LowercaseKeys));
+            println!("NEW RESULT from {}: {:?}", short_template_name, &new_result);
+            // merge with the result
+            if result.len() == 0 {
+                result = new_result;
+            } else {
+                for (i, nrow) in new_result.into_iter().enumerate() {
+                    result[i].overwrite_from(nrow);
+                }
+            }
+        }
+
+        println!("RESULT: {:?}\n", &result);
+
         if result == yaml_map.parsed_sample {
             println!("Parsed result matches YAML");
             VerifyResult::VerifySuccess
@@ -140,18 +162,17 @@ fn main() {
             &test_family_dir
         ));
         for test_set in &test_set_names {
-            let cli_cmd = test_set.replace_all("_", " ");
+            let cli_cmd = test_set.replace("_", " ");
 
-            let candidate_template_name = format!("{}_{}", test_family, test_set);
-            if template_names_set.contains(&candidate_template_name) {
+            if let Some((index_dir, row)) =
+                cli_table.get_template_for_command(&test_family, &cli_cmd)
+            {
+                // let candidate_template_name = format!("{}_{}", test_family, test_set);
+
                 let test_dir = format!("{}/tests/{}/{}/", &root_path, test_family, test_set);
                 let test_names = collect_file_names(&test_dir, "raw")
                     .expect("Could not scan the template directory");
 
-                let template_file = format!(
-                    "{}/ntc_templates/templates/{}.textfsm",
-                    &root_path, &candidate_template_name
-                );
                 for test_name in &test_names {
                     let data_file = format!(
                         "{}/tests/{}/{}/{}.raw",
@@ -162,9 +183,12 @@ fn main() {
                         &root_path, test_family, test_set, test_name
                     );
                     if std::path::Path::new(&yaml_file).exists() {
-                        println!("VERIFY: {} {} {}", &template_file, &data_file, &yaml_file);
+                        println!(
+                            "VERIFY CLI: '{}' {} {:?} {} {}",
+                            &cli_cmd, &index_dir, &row, &data_file, &yaml_file
+                        );
                         verify_count += 1;
-                        match verify(&template_file, &data_file, &yaml_file) {
+                        match verify(&index_dir, &row, &data_file, &yaml_file) {
                             VerifyResult::CouldNotLoadYaml => {
                                 result_no_yaml_count += 1;
                             }
@@ -193,5 +217,4 @@ fn main() {
     println!("      Could not load YAML: {}", result_no_yaml_count);
     println!("      Verify success: {}", result_success_count);
     println!("      Results differ: {}", result_differ_count);
-    */
 }
