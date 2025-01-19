@@ -202,6 +202,7 @@ fn main() {
                                 result_success_count += 1;
                             }
                             VerifyResult::ResultsDiffer => {
+                                // panic!("Results differ");
                                 result_differ_count += 1;
                             }
                         }

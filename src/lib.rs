@@ -844,7 +844,12 @@ impl TextFSM {
                     }
                     trace!("TMP KEY: {:?}", &tmp_datarec.record_key);
                     self.curr_record.record_key = tmp_datarec.record_key;
-                    self.filldown_record.overwrite_from(tmp_filldown_rec);
+                    // The below is incorrect:
+                    // self.filldown_record.overwrite_from(tmp_filldown_rec);
+                    // This is correct:
+                    for (name, v) in tmp_filldown_rec.fields {
+                        self.filldown_record.append_value(name, v);
+                    }
                     transition = rule.transition.clone();
                 }
                 // println!("TRANS: {:?}", &transition);
