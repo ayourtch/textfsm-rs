@@ -6,7 +6,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub mod cli_table;
 pub mod varsubst;
+pub use cli_table::CliTable;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DataRecord(pub HashMap<String, Value>);

@@ -12,4 +12,5 @@ serde = { version = "*", features = ["derive"] }
 serde_yaml = "*"
 log = "*"
 env_logger = "*"
+csv = "*"
 

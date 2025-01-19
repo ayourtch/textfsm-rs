@@ -108,6 +108,7 @@ fn main() {
 
     let template_dir = format!("{}/ntc_templates/templates/", &root_path);
     let cli_table = CliTable::from_file(&format!("{}/index", &template_dir));
+    println!("CLI table: {:?}", &cli_table);
     /*
     let tests_dir = format!("{}/tests/", &root_path);
     let template_names = collect_file_names(&template_dir, "textfsm")
