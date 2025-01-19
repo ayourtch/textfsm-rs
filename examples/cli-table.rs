@@ -70,12 +70,12 @@ fn verify(
             }
             println!("Only in yaml: {:?}", &only_in_yaml);
             println!("Only in parse: {:?}", &only_in_parse);
-            println!("\n\n");
+            println!("\n");
             if mismatch_count == 0 {
                 println!("Results differ, but only by order");
                 VerifyResult::VerifySuccess
             } else {
-                println!("Results differ");
+                println!("Results differ = mismatch count = {}", &mismatch_count);
                 VerifyResult::ResultsDiffer
             }
         }
@@ -130,6 +130,7 @@ struct TestRecord {
 }
 
 fn main() {
+    env_logger::init();
     let root_path = std::env::args()
         .nth(1)
         .expect("missing path to a https://github.com/networktocode/ntc-templates checkout");
@@ -202,7 +203,7 @@ fn main() {
                                 result_success_count += 1;
                             }
                             VerifyResult::ResultsDiffer => {
-                                // panic!("Results differ");
+                                println!("RESULTS DIFFER FOR {}", &data_file);
                                 result_differ_count += 1;
                             }
                         }

@@ -41,10 +41,10 @@ impl DataRecord {
                 if i < other.len() {
                     let v0 = other[i].get(k);
                     if v0.is_none() || v0.unwrap() != v {
-                        vo.push(k.clone());
+                        vo.push(format!("{}:{:?}", &k, &v));
                     }
                 } else {
-                    vo.push(k.clone());
+                    vo.push(format!("{}:{:?}", &k, &v));
                 }
             }
             only_in_result.push(vo);
@@ -56,10 +56,10 @@ impl DataRecord {
                 if i < result.len() {
                     let v0 = result[i].get(k);
                     if v0.is_none() || v0.unwrap() != v {
-                        vo.push(k.clone());
+                        vo.push(format!("{}:{:?}", &k, &v));
                     }
                 } else {
-                    vo.push(k.clone());
+                    vo.push(format!("{}:{:?}", &k, &v));
                 }
             }
             only_in_other.push(vo);
