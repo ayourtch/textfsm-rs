@@ -15,8 +15,65 @@ impl DataRecord {
     pub fn new() -> Self {
         Default::default()
     }
+
+    pub fn compare_sets(
+        result: &Vec<Self>,
+        other: &Vec<Self>,
+    ) -> (Vec<Vec<String>>, Vec<Vec<String>>) {
+        let mut only_in_result: Vec<Vec<String>> = vec![];
+        let mut only_in_other: Vec<Vec<String>> = vec![];
+
+        for (i, irec) in result.iter().enumerate() {
+            let mut vo: Vec<String> = vec![];
+            for (k, v) in &irec.0 {
+                if i < other.len() {
+                    let v0 = other[i].get(k);
+                    if v0.is_none() || v0.unwrap() != v {
+                        vo.push(k.clone());
+                    }
+                } else {
+                    vo.push(k.clone());
+                }
+            }
+            only_in_result.push(vo);
+        }
+
+        for (i, irec) in other.iter().enumerate() {
+            let mut vo: Vec<String> = vec![];
+            for (k, v) in &irec.0 {
+                if i < result.len() {
+                    let v0 = result[i].get(k);
+                    if v0.is_none() || v0.unwrap() != v {
+                        vo.push(k.clone());
+                    }
+                } else {
+                    vo.push(k.clone());
+                }
+            }
+            only_in_other.push(vo);
+        }
+        (only_in_result, only_in_other)
+    }
+
     pub fn insert(&mut self, name: String, value: String) {
-        self.0.insert(name, Value::Single(value));
+        if self.0.contains_key(&name) {
+            let mut existing = self.0.remove(&name);
+            match existing {
+                None => {
+                    panic!("internal error");
+                }
+                Some(Value::Single(oldval)) => {
+                    let newval = Value::List(vec![oldval, value]);
+                    self.0.insert(name, newval);
+                }
+                Some(Value::List(ref mut oldlist)) => {
+                    oldlist.push(value);
+                    self.0.insert(name, existing.unwrap());
+                }
+            }
+        } else {
+            self.0.insert(name, Value::Single(value));
+        }
     }
 
     pub fn remove(&mut self, key: &str) {

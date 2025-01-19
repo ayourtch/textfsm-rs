@@ -4,7 +4,7 @@ use textfsm_rs::*;
 
 #[derive(Serialize, Deserialize)]
 struct ParsedSample {
-    parsed_sample: Vec<HashMap<String, String>>,
+    parsed_sample: Vec<DataRecord>,
 }
 
 fn main() {
@@ -34,30 +34,8 @@ fn main() {
             println!("yaml: {:?}", &yaml_map.parsed_sample);
             println!("\n");
 
-            let mut only_in_yaml: Vec<Vec<String>> = vec![];
-            let mut only_in_parse: Vec<Vec<String>> = vec![];
-
-            for (i, irec) in result.iter().enumerate() {
-                let mut vo: Vec<String> = vec![];
-                for (k, _v) in irec {
-                    if i >= yaml_map.parsed_sample.len()
-                        || yaml_map.parsed_sample[i].get(k).is_none()
-                    {
-                        vo.push(k.clone());
-                    }
-                }
-                only_in_parse.push(vo);
-            }
-
-            for (i, irec) in yaml_map.parsed_sample.iter().enumerate() {
-                let mut vo: Vec<String> = vec![];
-                for (k, _v) in irec {
-                    if i >= result.len() || result[i].get(k).is_none() {
-                        vo.push(k.clone());
-                    }
-                }
-                only_in_yaml.push(vo);
-            }
+            let (only_in_parse, only_in_yaml) =
+                DataRecord::compare_sets(&result, &yaml_map.parsed_sample);
 
             println!("Only in yaml: {:?}", &only_in_yaml);
             println!("Only in parse: {:?}", &only_in_parse);
