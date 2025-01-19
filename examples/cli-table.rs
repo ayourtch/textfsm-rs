@@ -108,7 +108,11 @@ fn main() {
 
     let template_dir = format!("{}/ntc_templates/templates/", &root_path);
     let cli_table = CliTable::from_file(&format!("{}/index", &template_dir));
-    println!("CLI table: {:?}", &cli_table);
+    // println!("CLI table: {:?}", &cli_table);
+    if let Some((index_name, row)) = cli_table.get_template_for_command("cisco_ios", "show int") {
+        println!("index: {:?}", index_name);
+        println!("Row: {:?}", &row);
+    }
     /*
     let tests_dir = format!("{}/tests/", &root_path);
     let template_names = collect_file_names(&template_dir, "textfsm")

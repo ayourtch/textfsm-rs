@@ -1,4 +1,7 @@
+use fancy_regex::Regex;
+use std::collections::HashMap;
 use std::error::Error;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct ParsedCliTable {
@@ -9,21 +12,21 @@ pub struct ParsedCliTable {
 #[derive(Debug, Clone)]
 pub struct CliTable {
     pub tables: Vec<ParsedCliTable>,
-    pub regex_rules: Vec<CliTableRegexRule>,
+    pub platform_regex_rules: HashMap<String, Vec<CliTableRegexRule>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct CliTableRegexRule {
     pub table_index: usize,
     pub row_index: usize,
-    pub expanded_command: String,
+    pub command_regex: Regex,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CliTableRow {
     templates: Vec<String>,
     hostname: Option<String>,
-    vendor: Option<String>,
+    platform: Option<String>,
     command: String,
 }
 
@@ -53,14 +56,14 @@ impl ParsedCliTable {
 
         let template_position = headers.iter().position(|x| *x == "Template").unwrap();
         let command_position = headers.iter().position(|x| *x == "Command").unwrap();
-        let maybe_vendor_position = headers.iter().position(|x| *x == "Vendor");
+        let maybe_platform_position = headers.iter().position(|x| *x == "Platform");
         let maybe_hostname_position = headers.iter().position(|x| *x == "Hostname");
 
         for result in rdr.records() {
             let record = result?;
+            let platform: Option<String> =
+                maybe_platform_position.map(|ppos| record[ppos].to_string());
             let hostname: Option<String> =
-                maybe_vendor_position.map(|vpos| record[vpos].to_string());
-            let vendor: Option<String> =
                 maybe_hostname_position.map(|hpos| record[hpos].to_string());
             let templates: Vec<String> = record[template_position]
                 .split(":")
@@ -71,7 +74,7 @@ impl ParsedCliTable {
             let row = CliTableRow {
                 templates,
                 hostname,
-                vendor,
+                platform,
                 command,
             };
             rows.push(row);
@@ -142,24 +145,57 @@ impl CliTable {
         result
     }
 
+    fn get_directory(filename: &str) -> Option<String> {
+        let path = Path::new(filename);
+        path.parent().map(|p| p.to_string_lossy().into_owned())
+    }
+
+    pub fn get_template_for_command(
+        &self,
+        platform: &str,
+        cmd: &str,
+    ) -> Option<(String, CliTableRow)> {
+        let plat_regex_list = self
+            .platform_regex_rules
+            .get(platform)
+            .expect("Could not find platform");
+        for rule in plat_regex_list {
+            if rule.command_regex.is_match(cmd).expect("Fancy regex ok?") {
+                let row = self.tables[rule.table_index].rows[rule.row_index].clone();
+                let fname = &self.tables[rule.table_index].fname;
+                if let Some(fdir) = Self::get_directory(fname) {
+                    return Some((fdir, row));
+                }
+            }
+        }
+        None
+    }
+
     pub fn from_file(fname: &str) -> Self {
         let parsed_cli_table = ParsedCliTable::from_file(fname);
         let tables = vec![parsed_cli_table];
-        let mut regex_rules: Vec<CliTableRegexRule> = vec![];
+        let mut platform_regex_rules: HashMap<String, Vec<CliTableRegexRule>> = Default::default();
 
         for (table_index, table) in tables.iter().enumerate() {
             for (row_index, row) in table.rows.iter().enumerate() {
                 let expanded_command = Self::expand_brackets(&row.command);
+                let command_regex = Regex::new(&expanded_command).unwrap();
+
                 let rule = CliTableRegexRule {
                     table_index,
                     row_index,
-                    expanded_command,
+                    command_regex,
                 };
-                regex_rules.push(rule);
+                let no_platform = format!("no-platform");
+                let platform_name: &str = row.platform.as_ref().unwrap_or(&no_platform);
+                platform_regex_rules
+                    .entry(platform_name.into())
+                    .or_insert_with(Vec::new)
+                    .push(rule);
             }
         }
         CliTable {
-            regex_rules,
+            platform_regex_rules,
             tables,
         }
     }
