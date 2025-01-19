@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 pub mod varsubst;
 
-type DataRecord = HashMap<String, String>;
+pub type DataRecord = HashMap<String, String>;
 
 #[derive(Parser, Debug, Default, Clone)]
 #[grammar = "textfsm.pest"]

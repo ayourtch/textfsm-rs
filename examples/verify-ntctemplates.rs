@@ -4,7 +4,7 @@ use textfsm_rs::*;
 
 #[derive(Serialize, Deserialize)]
 struct ParsedSample {
-    parsed_sample: Vec<HashMap<String, String>>,
+    parsed_sample: Vec<DataRecord>,
 }
 
 enum VerifyResult {
